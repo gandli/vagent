@@ -88,13 +88,30 @@ pub fn render(spec: &Spec) -> Result<serde_json::Value, Error> {
 
     let routing = spec.routing_json()?;
 
+    let mut outbounds = vec![
+        serde_json::json!({ "protocol": "freedom", "tag": "direct" }),
+        serde_json::json!({ "protocol": "blackhole", "tag": "block" }),
+    ];
+    // 若有域名分流到 WARP,则追加 wireguard 出站(占位密钥,由部署时注入)。
+    if spec.needs_warp() {
+        outbounds.push(serde_json::json!({
+            "protocol": "wireguard",
+            "tag": "warp",
+            "settings": {
+                "secretKey": "<warp-private-key>",
+                "address": ["172.16.0.2/32", "fd01:5ca1:ab1e:80fa:ab85:6eea:213f:81a/128"],
+                "peers": [{
+                    "publicKey": "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+                    "endpoint": "162.159.192.1:2408"
+                }]
+            }
+        }));
+    }
+
     Ok(serde_json::json!({
         "log": { "loglevel": "warning" },
         "inbounds": inbounds,
-        "outbounds": [
-            { "protocol": "freedom", "tag": "direct" },
-            { "protocol": "blackhole", "tag": "block" }
-        ],
+        "outbounds": outbounds,
         "routing": routing
     }))
 }
@@ -175,5 +192,39 @@ mod tests {
         let ib = &v["inbounds"][0];
         assert_eq!(ib["streamSettings"]["security"], "reality");
         assert_eq!(ib["streamSettings"]["realitySettings"]["dest"], "x.com:443");
+    }
+
+    #[test]
+    fn render_adds_warp_outbound_when_needed() {
+        let mut spec = Spec::default_for("x.com");
+        spec.rules.warp_domains.push("netflix.com".into());
+        let v = render(&spec).unwrap();
+        let tags: Vec<&str> = v["outbounds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|o| o["tag"].as_str().unwrap())
+            .collect();
+        assert!(tags.contains(&"warp"));
+        let warp = v["outbounds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|o| o["tag"] == "warp")
+            .unwrap();
+        assert_eq!(warp["protocol"], "wireguard");
+    }
+
+    #[test]
+    fn render_no_warp_outbound_by_default() {
+        let spec = Spec::default_for("x.com");
+        let v = render(&spec).unwrap();
+        let tags: Vec<&str> = v["outbounds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|o| o["tag"].as_str().unwrap())
+            .collect();
+        assert!(!tags.contains(&"warp"));
     }
 }

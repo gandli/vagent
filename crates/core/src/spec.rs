@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// 分流规则:MVP 仅「黑名单域名」+「BT 阻断」。
+/// 分流规则:黑名单域名 + BT 阻断 + 广告拦截 + WARP/直连分流。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct Rules {
     /// 禁止访问的域名(黑名单)。
@@ -10,6 +10,15 @@ pub struct Rules {
     /// 是否阻断 P2P / BT 下载。
     #[serde(default)]
     pub block_bt: bool,
+    /// 是否用 geosite 拦截广告(category-ads-all)。
+    #[serde(default)]
+    pub block_ads: bool,
+    /// 走 WARP 出站的域名(解锁流媒体/规避 IP 验证)。
+    #[serde(default)]
+    pub warp_domains: Vec<String>,
+    /// 强制直连的域名(白名单,优先级最高)。
+    #[serde(default)]
+    pub direct_domains: Vec<String>,
 }
 
 impl Rules {

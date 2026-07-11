@@ -7,9 +7,28 @@ use serde_json::json;
 
 impl Spec {
     /// 渲染 routing 规则段(Xray routing 结构)。
+    /// 规则顺序即优先级(Xray 取首个匹配):
+    /// 直连白名单 → 广告拦截 → 域名黑名单 → BT 阻断 → WARP 分流。
     pub fn routing_json(&self) -> Result<serde_json::Value, Error> {
         let mut rules: Vec<serde_json::Value> = vec![];
 
+        // 1. 强制直连白名单(优先级最高)
+        if !self.rules.direct_domains.is_empty() {
+            rules.push(json!({
+                "type": "field",
+                "domain": self.rules.direct_domains,
+                "outboundTag": "direct"
+            }));
+        }
+        // 2. 广告拦截(geosite)
+        if self.rules.block_ads {
+            rules.push(json!({
+                "type": "field",
+                "domain": ["geosite:category-ads-all"],
+                "outboundTag": "block"
+            }));
+        }
+        // 3. 域名黑名单
         if !self.rules.domain_blocklist.is_empty() {
             rules.push(json!({
                 "type": "field",
@@ -17,6 +36,7 @@ impl Spec {
                 "outboundTag": "block"
             }));
         }
+        // 4. BT 阻断
         if self.rules.block_bt {
             rules.push(json!({
                 "type": "field",
@@ -24,11 +44,24 @@ impl Spec {
                 "outboundTag": "block"
             }));
         }
+        // 5. WARP 分流(指定域名走 WARP 出站)
+        if !self.rules.warp_domains.is_empty() {
+            rules.push(json!({
+                "type": "field",
+                "domain": self.rules.warp_domains,
+                "outboundTag": "warp"
+            }));
+        }
 
         Ok(json!({
             "domainStrategy": "IPIfNonMatch",
             "rules": rules
         }))
+    }
+
+    /// 是否需要 WARP 出站(有域名分流到 WARP 时)。
+    pub fn needs_warp(&self) -> bool {
+        !self.rules.warp_domains.is_empty()
     }
 }
 
@@ -75,5 +108,54 @@ mod tests {
         spec.rules.block_bt = true;
         let r = spec.routing_json().unwrap();
         assert_eq!(r["rules"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn direct_domains_render_first() {
+        let mut spec = Spec::default_for("x.com");
+        spec.rules.direct_domains.push("bank.com".into());
+        spec.rules.block_ads = true;
+        let r = spec.routing_json().unwrap();
+        let rules = r["rules"].as_array().unwrap();
+        // 白名单直连必须排在广告拦截之前
+        assert_eq!(rules[0]["outboundTag"], "direct");
+        assert_eq!(rules[1]["outboundTag"], "block");
+    }
+
+    #[test]
+    fn block_ads_uses_geosite() {
+        let mut spec = Spec::default_for("x.com");
+        spec.rules.block_ads = true;
+        let r = spec.routing_json().unwrap();
+        let rules = r["rules"].as_array().unwrap();
+        assert_eq!(rules[0]["domain"][0], "geosite:category-ads-all");
+    }
+
+    #[test]
+    fn warp_domains_route_to_warp() {
+        let mut spec = Spec::default_for("x.com");
+        spec.rules.warp_domains.push("netflix.com".into());
+        let r = spec.routing_json().unwrap();
+        let rules = r["rules"].as_array().unwrap();
+        assert_eq!(rules[0]["outboundTag"], "warp");
+        assert!(spec.needs_warp());
+    }
+
+    #[test]
+    fn priority_order_full_stack() {
+        let mut spec = Spec::default_for("x.com");
+        spec.rules.direct_domains.push("d.com".into());
+        spec.rules.block_ads = true;
+        spec.rules.domain_blocklist.push("b.com".into());
+        spec.rules.block_bt = true;
+        spec.rules.warp_domains.push("w.com".into());
+        let r = spec.routing_json().unwrap();
+        let tags: Vec<&str> = r["rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x["outboundTag"].as_str().unwrap())
+            .collect();
+        assert_eq!(tags, vec!["direct", "block", "block", "block", "warp"]);
     }
 }

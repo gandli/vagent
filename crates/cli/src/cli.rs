@@ -73,4 +73,11 @@ pub enum Commands {
         #[arg(long, default_value = "xray")]
         core: String,
     },
+    /// 分流规则:block/direct/warp <域名> | ads/bt [on|off] | list
+    Route {
+        /// 动作:block/direct/warp/ads/bt/list
+        action: String,
+        /// 域名(block/direct/warp)或开关(ads/bt: on|off)
+        value: Option<String>,
+    },
 }

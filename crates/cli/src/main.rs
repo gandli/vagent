@@ -33,6 +33,9 @@ fn main() -> anyhow::Result<()> {
         Commands::UserLink { name } => commands::user::link(&config, &name)?,
         Commands::CoreInstall { core, version } => commands::core_install::run(&core, &version)?,
         Commands::Core { action, core } => commands::core_ctl::run(&core, &action)?,
+        Commands::Route { action, value } => {
+            commands::route::run(&config, &action, value.as_deref())?
+        }
     }
     Ok(())
 }
