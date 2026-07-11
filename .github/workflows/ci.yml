@@ -77,7 +77,8 @@ jobs:
         run: |
           ./target/release/vagent init --domain example.com --config /tmp/spec.toml
           ./target/release/vagent user-add alice --config /tmp/spec.toml
-          ./target/release/vagent reality-gen --config /tmp/spec.toml || true
+          which xray || ls -l /usr/local/bin/xray
+          ./target/release/vagent reality-gen --config /tmp/spec.toml
           ./target/release/vagent render --core xray --out /tmp/xray.json --config /tmp/spec.toml
           ./xray-bin/xray run -test -config /tmp/xray.json && echo "XRAY CONFIG OK"
       - name: Render + validate sing-box config (tuic user)

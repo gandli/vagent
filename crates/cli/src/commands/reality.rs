@@ -29,7 +29,9 @@ pub fn run(config: &Path, name: Option<&str>) -> anyhow::Result<()> {
         Err(e) => return Err(anyhow::anyhow!("加载配置失败: {e}")),
     };
 
-    let keys = generate_public_key(&xray_bin(), &RealExecutor).map_err(|e| anyhow::anyhow!(e))?;
+    let bin = xray_bin();
+    let keys = generate_public_key(&bin, &RealExecutor)
+        .map_err(|e| anyhow::anyhow!("Reality 密钥生成失败 (xray 路径: {bin}): {e}"))?;
     let sid = generate_short_id();
 
     let targets: Vec<String> = match name {
