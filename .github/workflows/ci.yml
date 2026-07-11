@@ -73,6 +73,14 @@ jobs:
           tar xzf sb.tar.gz
           mv sing-box-*/sing-box ./sing-box-bin 2>/dev/null || true
           echo "sing-box $SVER"
+      - name: Default config path (no-root, ~/.config/vagent)
+        run: |
+          rm -rf "$HOME/.config/vagent"
+          ./target/release/vagent init --domain pu.example.com
+          test -f "$HOME/.config/vagent/spec.toml" && echo "DEFAULT PATH OK: $HOME/.config/vagent/spec.toml"
+          ./target/release/vagent user-add pu1 --protocol tuic --port 9443
+          ./target/release/vagent render --core singbox --out /tmp/pu_sb.json
+          grep -q "$HOME/.config/vagent/certs/pu.example.com.cer" /tmp/pu_sb.json && echo "CERT PATH FOLLOWS HOME OK"
       - name: Render + validate xray config
         run: |
           ./target/release/vagent init --domain example.com --config /tmp/spec.toml
