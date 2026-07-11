@@ -60,14 +60,14 @@ jobs:
         run: cargo build --release --bins
       - name: Download xray-core
         run: |
-          VER=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep -oE 'tag_name":"v[0-9.]+' | head -1 | cut -d'"' -f4)
+          VER="v1.8.23"
           curl -sL -o xray.zip "https://github.com/XTLS/Xray-core/releases/download/${VER}/Xray-linux-64.zip"
           unzip -oq xray.zip -d xray-bin
           cp xray-bin/xray /usr/local/bin/xray && chmod +x /usr/local/bin/xray
           echo "xray $VER"
       - name: Download sing-box
         run: |
-          SVER=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | grep -oE 'tag_name":"v[0-9.]+' | head -1 | cut -d'"' -f4)
+          SVER="v1.10.0"
           curl -sL -o sb.tar.gz "https://github.com/SagerNet/sing-box/releases/download/${SVER}/sing-box-${SVER}-linux-amd64.tar.gz"
           tar xzf sb.tar.gz
           mv sing-box-*/sing-box ./sing-box-bin 2>/dev/null || true
