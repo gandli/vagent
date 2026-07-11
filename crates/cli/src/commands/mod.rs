@@ -6,6 +6,7 @@ pub mod init;
 pub mod reality;
 pub mod render;
 pub mod route;
+pub mod service;
 pub mod status;
 pub mod uninstall;
 pub mod user;

@@ -41,6 +41,11 @@ fn main() -> anyhow::Result<()> {
             commands::cert::issue(&domain, &ca, dns.as_deref())?
         }
         Commands::CertRenew => commands::cert::renew()?,
+        Commands::Service { action, core, init } => match action.as_str() {
+            "show" => commands::service::show(&core, &init)?,
+            "install" => commands::service::install(&core, &init)?,
+            other => return Err(anyhow::anyhow!("未知 service 动作: {other}")),
+        },
         Commands::RealityGen { name } => commands::reality::run(&config, name.as_deref())?,
         Commands::Uninstall { purge } => commands::uninstall::run(purge)?,
     }

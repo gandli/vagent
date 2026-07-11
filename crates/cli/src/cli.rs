@@ -96,6 +96,17 @@ pub enum Commands {
     },
     /// 续期所有 TLS 证书
     CertRenew,
+    /// 服务单元:生成/安装 systemd / openrc 单元
+    Service {
+        /// 动作:show / install
+        action: String,
+        /// 内核:xray / singbox / api
+        #[arg(long, default_value = "xray")]
+        core: String,
+        /// init 系统:systemd / openrc
+        #[arg(long, default_value = "systemd")]
+        init: String,
+    },
     /// 生成 Reality 密钥(xray x25519),写入 spec
     RealityGen {
         /// 用户名(不填则对所有 Reality 用户)
