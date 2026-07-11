@@ -48,3 +48,37 @@ jobs:
         with:
           name: vagent-musl
           path: target/x86_64-unknown-linux-musl/release/vagent*
+
+  validate:
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        run: cargo build --release --bins
+      - name: Download xray-core
+        run: |
+          VER=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep -oE 'tag_name":"v[0-9.]+' | head -1 | cut -d'"' -f4)
+          curl -sL -o xray.zip "https://github.com/XTLS/Xray-core/releases/download/${VER}/Xray-linux-64.zip"
+          unzip -oq xray.zip -d xray-bin
+          echo "xray $VER"
+      - name: Download sing-box
+        run: |
+          SVER=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | grep -oE 'tag_name":"v[0-9.]+' | head -1 | cut -d'"' -f4)
+          curl -sL -o sb.tar.gz "https://github.com/SagerNet/sing-box/releases/download/${SVER}/sing-box-${SVER}-linux-amd64.tar.gz"
+          tar xzf sb.tar.gz
+          mv sing-box-*/sing-box ./sing-box-bin 2>/dev/null || true
+          echo "sing-box $SVER"
+      - name: Render + validate xray config
+        run: |
+          ./target/release/vagent init --domain example.com --config /tmp/spec.toml
+          ./target/release/vagent user-add alice --config /tmp/spec.toml
+          ./target/release/vagent render --core xray --out /tmp/xray.json --config /tmp/spec.toml
+          ./xray-bin/xray run -test -config /tmp/xray.json && echo "XRAY CONFIG OK"
+      - name: Render + validate sing-box config (tuic user)
+        run: |
+          ./target/release/vagent user-add t --protocol tuic --port 9443 --config /tmp/spec.toml
+          ./target/release/vagent render --core singbox --out /tmp/sb.json --config /tmp/spec.toml
+          ./sing-box-bin check -c /tmp/sb.json && echo "SING-BOX CONFIG OK"

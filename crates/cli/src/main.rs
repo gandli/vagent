@@ -21,7 +21,7 @@ fn main() -> anyhow::Result<()> {
             commands::init::run(domain.as_deref().unwrap_or("example.com"), &config, dry_run)?
         }
         Commands::Status => commands::status::run(&config)?,
-        Commands::Render => commands::render::run(&config)?,
+        Commands::Render { core, out } => commands::render::run(&config, &core, out.as_deref())?,
         Commands::Apply { dry_run } => commands::apply::run(&config, dry_run)?,
         Commands::UserAdd {
             name,

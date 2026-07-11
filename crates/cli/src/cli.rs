@@ -25,8 +25,15 @@ pub enum Commands {
     },
     /// 查看状态(从 spec 读取,不反推 JSON)
     Status,
-    /// 渲染 Xray 配置(MVP: VLESS+Reality)
-    Render,
+    /// 渲染内核配置(默认打印)
+    Render {
+        /// 内核:xray / singbox
+        #[arg(long, default_value = "xray")]
+        core: String,
+        /// 输出文件路径(不填则打印到 stdout)
+        #[arg(long)]
+        out: Option<String>,
+    },
     /// 应用配置:渲染→落盘→重载启用内核
     Apply {
         /// 只渲染并打印,不落盘/不重载
