@@ -4,6 +4,26 @@ Rust 编写的 Xray-core / sing-box 管理工具。spec 驱动、双核抽象、
 
 > 自托管运维工具。仅用于授权测试环境与自建 VPS。
 
+## 快速开始
+
+一句话安装(对标 v2ray-agent 的 `install.sh` 体验,musl 静态单文件,零依赖):
+
+```bash
+wget -P /root -N --no-check-certificate "https://raw.githubusercontent.com/gandli/proxy-tui/main/install.sh" && bash /root/install.sh
+```
+
+安装后,直接用 `vagent` 命令管理(它就是菜单入口):
+
+```bash
+vagent user-add alice                 # 新增 Reality 用户
+vagent user-link alice                # 生成分享链接
+vagent reality-gen                    # 生成 Reality 密钥(xray x25519)
+vagent apply                         # 渲染并应用配置
+vagent --help                       # 全部子命令
+```
+
+二进制来源:CI 自动构建的 musl 静态发行(`vagent` + `vagent-api`),安装脚本从最新 GitHub Release 拉取。
+
 ## 设计
 
 单一真相源:一份 `spec.toml` 描述域名、内核、用户、分流规则。所有内核配置、订阅链接、systemd 单元都从 spec 渲染得出,不反向解析 JSON。
