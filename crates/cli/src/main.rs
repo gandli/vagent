@@ -40,6 +40,7 @@ fn main() -> anyhow::Result<()> {
             commands::cert::issue(&domain, &ca, dns.as_deref())?
         }
         Commands::CertRenew => commands::cert::renew()?,
+        Commands::Uninstall { purge } => commands::uninstall::run(purge)?,
     }
     Ok(())
 }

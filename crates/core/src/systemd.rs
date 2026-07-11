@@ -52,6 +52,29 @@ pub fn install_unit(name: &str, content: &str) -> Result<(), Error> {
     Ok(())
 }
 
+/// 卸载步骤:停用服务 → 禁用 → 删单元 → reload。返回命令列表(纯函数,可单测)。
+/// 实际执行经 Executor;不含删除配置目录(由调用方决定是否保留)。
+pub fn uninstall_cmds() -> Vec<crate::executor::Cmd> {
+    use crate::executor::Cmd;
+    let services = ["vagent-xray", "vagent-singbox", "vagent-api"];
+    let mut cmds = vec![];
+    for s in services {
+        cmds.push(Cmd::new("systemctl").args(["stop", s]));
+        cmds.push(Cmd::new("systemctl").args(["disable", s]));
+        cmds.push(Cmd::new("rm").args(["-f", &format!("/etc/systemd/system/{s}.service")]));
+    }
+    cmds.push(Cmd::new("systemctl").args(["daemon-reload"]));
+    cmds
+}
+
+/// 执行卸载(经 Executor)。best-effort:单条失败不中断(服务可能本就不存在)。
+pub fn uninstall(ex: &dyn crate::executor::Executor) -> Result<(), Error> {
+    for c in uninstall_cmds() {
+        let _ = ex.run(&c); // best-effort
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -70,5 +93,30 @@ mod tests {
         let u = api_unit("/usr/local/bin/vagent-api");
         assert!(u.contains("vagent local API"));
         assert!(u.contains("ExecStart=/usr/local/bin/vagent-api"));
+    }
+
+    #[test]
+    fn uninstall_cmds_cover_all_services() {
+        let cmds = uninstall_cmds();
+        let all = cmds
+            .iter()
+            .map(|c| c.display())
+            .collect::<Vec<_>>()
+            .join("\n");
+        for s in ["vagent-xray", "vagent-singbox", "vagent-api"] {
+            assert!(all.contains(&format!("stop {s}")));
+            assert!(all.contains(&format!("disable {s}")));
+        }
+        assert!(all.contains("daemon-reload"));
+    }
+
+    #[test]
+    fn uninstall_best_effort_ignores_failures() {
+        use crate::executor::{ExecOutput, FakeExecutor};
+        // 全部失败也应返回 Ok(best-effort)
+        let ex = FakeExecutor::new()
+            .expect("systemctl", ExecOutput::failure(1, "not found"))
+            .expect("rm", ExecOutput::failure(1, "no file"));
+        assert!(uninstall(&ex).is_ok());
     }
 }

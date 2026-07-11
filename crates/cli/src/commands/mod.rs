@@ -6,4 +6,5 @@ pub mod init;
 pub mod render;
 pub mod route;
 pub mod status;
+pub mod uninstall;
 pub mod user;

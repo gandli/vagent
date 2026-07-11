@@ -93,4 +93,10 @@ pub enum Commands {
     },
     /// 续期所有 TLS 证书
     CertRenew,
+    /// 卸载:停用并删除所有 vagent 服务
+    Uninstall {
+        /// 一并删除 /etc/vagent 配置目录
+        #[arg(long)]
+        purge: bool,
+    },
 }
