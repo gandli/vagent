@@ -22,7 +22,8 @@ pub fn run(config: &Path, sign: bool) -> anyhow::Result<()> {
     // 签名:secret 跟随 config 父目录(root-optional)
     let base = Spec::base_dir(config);
     let secret_path = base.join("secret");
-    let secret = subscribe::load_or_create_secret_at(&secret_path).map_err(|e| anyhow::anyhow!(e))?;
+    let secret =
+        subscribe::load_or_create_secret_at(&secret_path).map_err(|e| anyhow::anyhow!(e))?;
     let signed = subscribe::sign(&bundle, &secret);
     println!("{signed}");
     Ok(())

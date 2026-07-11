@@ -53,7 +53,12 @@ pub enum Challenge {
 }
 
 /// 构造签发命令(acme.sh)。cert_dir 跟随 config 父目录(root-optional)。
-pub fn issue_cmd(domain: &str, ca: Ca, challenge: &Challenge, cert_dir: &str) -> Result<Cmd, Error> {
+pub fn issue_cmd(
+    domain: &str,
+    ca: Ca,
+    challenge: &Challenge,
+    cert_dir: &str,
+) -> Result<Cmd, Error> {
     let mut args: Vec<String> = vec![
         "--issue".into(),
         "-d".into(),
@@ -100,7 +105,13 @@ pub fn enddate_cmd(domain: &str, cert_dir: &str) -> Cmd {
 }
 
 /// 执行签发(经 Executor)。
-pub fn issue(domain: &str, ca: Ca, challenge: &Challenge, cert_dir: &str, ex: &dyn Executor) -> Result<(), Error> {
+pub fn issue(
+    domain: &str,
+    ca: Ca,
+    challenge: &Challenge,
+    cert_dir: &str,
+    ex: &dyn Executor,
+) -> Result<(), Error> {
     let out = ex.run(&issue_cmd(domain, ca, challenge, cert_dir)?)?;
     if out.ok() {
         Ok(())
@@ -133,7 +144,13 @@ mod tests {
 
     #[test]
     fn issue_cmd_standalone_letsencrypt() {
-        let c = issue_cmd("v.example.com", Ca::LetsEncrypt, &Challenge::Standalone, "/tmp/certs").unwrap();
+        let c = issue_cmd(
+            "v.example.com",
+            Ca::LetsEncrypt,
+            &Challenge::Standalone,
+            "/tmp/certs",
+        )
+        .unwrap();
         assert_eq!(c.program, "acme.sh");
         let d = c.display();
         assert!(d.contains("-d v.example.com"));
@@ -144,7 +161,13 @@ mod tests {
 
     #[test]
     fn issue_cmd_dns_zerossl() {
-        let c = issue_cmd("x.com", Ca::ZeroSsl, &Challenge::Dns("dns_cf".into()), "/tmp/certs").unwrap();
+        let c = issue_cmd(
+            "x.com",
+            Ca::ZeroSsl,
+            &Challenge::Dns("dns_cf".into()),
+            "/tmp/certs",
+        )
+        .unwrap();
         let d = c.display();
         assert!(d.contains("--server zerossl"));
         assert!(d.contains("--dns dns_cf"));
@@ -152,7 +175,12 @@ mod tests {
 
     #[test]
     fn buypass_rejects_dns() {
-        let r = issue_cmd("x.com", Ca::BuyPass, &Challenge::Dns("dns_cf".into()), "/tmp/certs");
+        let r = issue_cmd(
+            "x.com",
+            Ca::BuyPass,
+            &Challenge::Dns("dns_cf".into()),
+            "/tmp/certs",
+        );
         assert!(r.is_err());
     }
 
@@ -181,13 +209,27 @@ mod tests {
     #[test]
     fn issue_failure_propagates() {
         let ex = FakeExecutor::new().expect("acme.sh", ExecOutput::failure(1, "dnserr"));
-        assert!(issue("x.com", Ca::LetsEncrypt, &Challenge::Standalone, "/tmp/certs", &ex).is_err());
+        assert!(issue(
+            "x.com",
+            Ca::LetsEncrypt,
+            &Challenge::Standalone,
+            "/tmp/certs",
+            &ex
+        )
+        .is_err());
     }
 
     #[test]
     fn issue_success_ok() {
         let ex = FakeExecutor::new().expect("acme.sh", ExecOutput::success("issued"));
-        assert!(issue("x.com", Ca::LetsEncrypt, &Challenge::Standalone, "/tmp/certs", &ex).is_ok());
+        assert!(issue(
+            "x.com",
+            Ca::LetsEncrypt,
+            &Challenge::Standalone,
+            "/tmp/certs",
+            &ex
+        )
+        .is_ok());
     }
 
     #[test]

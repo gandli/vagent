@@ -275,7 +275,11 @@ fn service_menu() -> anyhow::Result<()> {
 fn subscribe_menu(config: &Path) -> anyhow::Result<()> {
     loop {
         println!();
-        let items = ["生成订阅链接(多用户 bundle)", "生成签名订阅(可识别/吊销)", "返回"];
+        let items = [
+            "生成订阅链接(多用户 bundle)",
+            "生成签名订阅(可识别/吊销)",
+            "返回",
+        ];
         match Select::new()
             .with_prompt("订阅管理")
             .items(&items)
