@@ -36,6 +36,10 @@ fn main() -> anyhow::Result<()> {
         Commands::Route { action, value } => {
             commands::route::run(&config, &action, value.as_deref())?
         }
+        Commands::CertIssue { domain, ca, dns } => {
+            commands::cert::issue(&domain, &ca, dns.as_deref())?
+        }
+        Commands::CertRenew => commands::cert::renew()?,
     }
     Ok(())
 }

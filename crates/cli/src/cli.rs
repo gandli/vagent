@@ -80,4 +80,17 @@ pub enum Commands {
         /// 域名(block/direct/warp)或开关(ads/bt: on|off)
         value: Option<String>,
     },
+    /// 签发 TLS 证书(acme.sh)
+    CertIssue {
+        /// 域名
+        domain: String,
+        /// CA:letsencrypt / zerossl / buypass
+        #[arg(long, default_value = "letsencrypt")]
+        ca: String,
+        /// DNS 验证 hook(如 dns_cf),不填则用 standalone
+        #[arg(long)]
+        dns: Option<String>,
+    },
+    /// 续期所有 TLS 证书
+    CertRenew,
 }

@@ -1,35 +1,108 @@
-//! TLS 自动(仅非 Reality 协议需要)。
-//! 本模块只拼装 acme.sh 命令 + 续期判断,不真跑。证书落 /etc/vagent/certs/。
+//! TLS 自动化(非 Reality 协议需要)。
+//! 拼装 acme.sh 命令 + 续期判断,经 Executor 执行。证书落 /etc/vagent/certs/。
+//! 支持多 CA(LetsEncrypt / ZeroSSL / BuyPass)与两种验证模式(standalone / DNS)。
 
 use crate::executor::{Cmd, Executor};
 use crate::Error;
 
 pub const CERT_DIR: &str = "/etc/vagent/certs";
+pub const ACME_HOME: &str = "/root/.acme.sh";
 
-/// 构造签发命令(acme.sh,standalone 模式)。
-pub fn issue_cmd(domain: &str) -> Cmd {
-    Cmd::new("acme.sh").args([
-        "--issue",
-        "-d",
-        domain,
-        "--standalone",
-        "-k",
-        "ec-256",
-        "--cert-file",
+/// 证书颁发机构。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Ca {
+    LetsEncrypt,
+    ZeroSsl,
+    BuyPass,
+}
+
+impl Ca {
+    /// acme.sh --server 参数值。
+    pub fn server(&self) -> &'static str {
+        match self {
+            Ca::LetsEncrypt => "letsencrypt",
+            Ca::ZeroSsl => "zerossl",
+            Ca::BuyPass => "buypass",
+        }
+    }
+
+    /// BuyPass 不支持 DNS 申请。
+    pub fn supports_dns(&self) -> bool {
+        !matches!(self, Ca::BuyPass)
+    }
+}
+
+impl std::str::FromStr for Ca {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "letsencrypt" | "le" => Ok(Ca::LetsEncrypt),
+            "zerossl" | "zero" => Ok(Ca::ZeroSsl),
+            "buypass" => Ok(Ca::BuyPass),
+            other => Err(format!("未知 CA: {other}")),
+        }
+    }
+}
+
+/// 验证模式。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Challenge {
+    /// standalone HTTP-01(需 80 端口空闲)。
+    Standalone,
+    /// DNS-01,dns_hook 如 "dns_cf"(Cloudflare)。
+    Dns(String),
+}
+
+/// 构造签发命令(acme.sh)。
+pub fn issue_cmd(domain: &str, ca: Ca, challenge: &Challenge) -> Result<Cmd, Error> {
+    let mut args: Vec<String> = vec![
+        "--issue".into(),
+        "-d".into(),
+        domain.to_string(),
+        "--server".into(),
+        ca.server().to_string(),
+        "-k".into(),
+        "ec-256".into(),
+    ];
+    match challenge {
+        Challenge::Standalone => args.push("--standalone".into()),
+        Challenge::Dns(hook) => {
+            if !ca.supports_dns() {
+                return Err(Error::Unsupported(format!(
+                    "{} 不支持 DNS 申请",
+                    ca.server()
+                )));
+            }
+            args.push("--dns".into());
+            args.push(hook.clone());
+        }
+    }
+    args.push("--cert-file".into());
+    args.push(format!("{CERT_DIR}/{domain}.cer"));
+    args.push("--key-file".into());
+    args.push(format!("{CERT_DIR}/{domain}.key"));
+    Ok(Cmd::new("acme.sh").args(args))
+}
+
+/// 构造续期(cron)命令。
+pub fn renew_cmd() -> Cmd {
+    Cmd::new("acme.sh").args(["--cron", "--home", ACME_HOME])
+}
+
+/// 检查证书剩余有效期命令(openssl x509 -enddate)。
+pub fn enddate_cmd(domain: &str) -> Cmd {
+    Cmd::new("openssl").args([
+        "x509",
+        "-enddate",
+        "-noout",
+        "-in",
         &format!("{CERT_DIR}/{domain}.cer"),
-        "--key-file",
-        &format!("{CERT_DIR}/{domain}.key"),
     ])
 }
 
-/// 构造续期命令。
-pub fn renew_cmd() -> Cmd {
-    Cmd::new("acme.sh").args(["--cron", "--home", "/root/.acme.sh"])
-}
-
 /// 执行签发(经 Executor)。
-pub fn issue(domain: &str, ex: &dyn Executor) -> Result<(), Error> {
-    let out = ex.run(&issue_cmd(domain))?;
+pub fn issue(domain: &str, ca: Ca, challenge: &Challenge, ex: &dyn Executor) -> Result<(), Error> {
+    let out = ex.run(&issue_cmd(domain, ca, challenge)?)?;
     if out.ok() {
         Ok(())
     } else {
@@ -40,34 +113,87 @@ pub fn issue(domain: &str, ex: &dyn Executor) -> Result<(), Error> {
     }
 }
 
-/// 判断证书是否临近到期(占位:<30 天需续)。真实实现解析 x509 有效期。
-pub fn needs_renew(_cert_path: &str) -> Result<bool, Error> {
-    // MVP 占位:真实逻辑用 openssl x509 -enddate 解析。
-    Ok(false)
+/// 执行续期。
+pub fn renew(ex: &dyn Executor) -> Result<(), Error> {
+    let out = ex.run(&renew_cmd())?;
+    if out.ok() {
+        Ok(())
+    } else {
+        Err(Error::Render(format!(
+            "acme.sh renew failed: {}",
+            out.stderr
+        )))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::executor::{ExecOutput, FakeExecutor};
+    use std::str::FromStr;
 
     #[test]
-    fn issue_cmd_targets_domain() {
-        let c = issue_cmd("v.example.com");
+    fn issue_cmd_standalone_letsencrypt() {
+        let c = issue_cmd("v.example.com", Ca::LetsEncrypt, &Challenge::Standalone).unwrap();
         assert_eq!(c.program, "acme.sh");
-        assert!(c.display().contains("-d v.example.com"));
-        assert!(c.display().contains("/etc/vagent/certs/v.example.com.cer"));
+        let d = c.display();
+        assert!(d.contains("-d v.example.com"));
+        assert!(d.contains("--server letsencrypt"));
+        assert!(d.contains("--standalone"));
+        assert!(d.contains("/etc/vagent/certs/v.example.com.cer"));
+    }
+
+    #[test]
+    fn issue_cmd_dns_zerossl() {
+        let c = issue_cmd("x.com", Ca::ZeroSsl, &Challenge::Dns("dns_cf".into())).unwrap();
+        let d = c.display();
+        assert!(d.contains("--server zerossl"));
+        assert!(d.contains("--dns dns_cf"));
+    }
+
+    #[test]
+    fn buypass_rejects_dns() {
+        let r = issue_cmd("x.com", Ca::BuyPass, &Challenge::Dns("dns_cf".into()));
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn ca_from_str_aliases() {
+        assert_eq!(Ca::from_str("le").unwrap(), Ca::LetsEncrypt);
+        assert_eq!(Ca::from_str("zerossl").unwrap(), Ca::ZeroSsl);
+        assert_eq!(Ca::from_str("buypass").unwrap(), Ca::BuyPass);
+        assert!(Ca::from_str("nope").is_err());
+    }
+
+    #[test]
+    fn ca_dns_support() {
+        assert!(Ca::LetsEncrypt.supports_dns());
+        assert!(Ca::ZeroSsl.supports_dns());
+        assert!(!Ca::BuyPass.supports_dns());
+    }
+
+    #[test]
+    fn enddate_cmd_targets_cert() {
+        let c = enddate_cmd("x.com");
+        assert_eq!(c.program, "openssl");
+        assert!(c.display().contains("/etc/vagent/certs/x.com.cer"));
     }
 
     #[test]
     fn issue_failure_propagates() {
         let ex = FakeExecutor::new().expect("acme.sh", ExecOutput::failure(1, "dnserr"));
-        assert!(issue("x.com", &ex).is_err());
+        assert!(issue("x.com", Ca::LetsEncrypt, &Challenge::Standalone, &ex).is_err());
     }
 
     #[test]
     fn issue_success_ok() {
         let ex = FakeExecutor::new().expect("acme.sh", ExecOutput::success("issued"));
-        assert!(issue("x.com", &ex).is_ok());
+        assert!(issue("x.com", Ca::LetsEncrypt, &Challenge::Standalone, &ex).is_ok());
+    }
+
+    #[test]
+    fn renew_via_executor() {
+        let ex = FakeExecutor::new().expect("acme.sh", ExecOutput::success("renewed"));
+        assert!(renew(&ex).is_ok());
     }
 }
