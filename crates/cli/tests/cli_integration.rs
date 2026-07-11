@@ -336,3 +336,65 @@ fn cert_path_follows_config_dir_not_root() -> Result<(), Box<dyn std::error::Err
     );
     Ok(())
 }
+
+#[test]
+fn subscribe_bundle_and_signed() -> Result<(), Box<dyn std::error::Error>> {
+    let tmp = tempfile::tempdir()?;
+    let cfg = tmp.path().join("vagent").join("spec.toml");
+
+    Command::cargo_bin("vagent")
+        .unwrap()
+        .args(["init", "--domain", "v.example.com", "--config"])
+        .arg(&cfg)
+        .assert()
+        .success();
+
+    // 两个 Reality 用户 → 订阅 bundle 应含二者
+    Command::cargo_bin("vagent")
+        .unwrap()
+        .args(["user-add", "alice", "--config"])
+        .arg(&cfg)
+        .assert()
+        .success();
+    Command::cargo_bin("vagent")
+        .unwrap()
+        .args(["user-add", "bob", "--config"])
+        .arg(&cfg)
+        .assert()
+        .success();
+
+    // 无签名订阅:纯 base64 bundle
+    let out = Command::cargo_bin("vagent")
+        .unwrap()
+        .args(["subscribe", "--config"])
+        .arg(&cfg)
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(!stdout.contains("#sig="), "未签名订阅不应含 sig: {stdout}");
+    let decoded = String::from_utf8(base64_decode(stdout.trim())).unwrap();
+    assert!(decoded.contains("alice"));
+    assert!(decoded.contains("bob"));
+
+    // 签名订阅:含 #sig=,且 secret 落在 config 父目录下(非 /etc)
+    let out = Command::cargo_bin("vagent")
+        .unwrap()
+        .args(["subscribe", "--sign", "--config"])
+        .arg(&cfg)
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("#sig="), "签名订阅应含 sig: {stdout}");
+    assert!(
+        tmp.path().join("vagent").join("secret").exists(),
+        "secret 应跟随 config 父目录"
+    );
+    Ok(())
+}
+
+/// 简易 base64 解码(测试用)。
+fn base64_decode(s: &str) -> Vec<u8> {
+    use base64::engine::general_purpose::STANDARD as B64;
+    use base64::Engine;
+    B64.decode(s.trim()).unwrap()
+}

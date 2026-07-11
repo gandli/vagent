@@ -24,7 +24,7 @@ pub struct AppState {
 type SharedState = Arc<AppState>;
 
 fn default_config() -> PathBuf {
-    PathBuf::from("/etc/vagent/spec.toml")
+    vagent_core::Spec::default_config_path()
 }
 
 #[tokio::main]

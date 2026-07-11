@@ -5,7 +5,6 @@
 use crate::executor::{Cmd, Executor};
 use crate::Error;
 
-pub const CERT_DIR: &str = "/etc/vagent/certs";
 pub const ACME_HOME: &str = "/root/.acme.sh";
 
 /// 证书颁发机构。
@@ -53,8 +52,8 @@ pub enum Challenge {
     Dns(String),
 }
 
-/// 构造签发命令(acme.sh)。
-pub fn issue_cmd(domain: &str, ca: Ca, challenge: &Challenge) -> Result<Cmd, Error> {
+/// 构造签发命令(acme.sh)。cert_dir 跟随 config 父目录(root-optional)。
+pub fn issue_cmd(domain: &str, ca: Ca, challenge: &Challenge, cert_dir: &str) -> Result<Cmd, Error> {
     let mut args: Vec<String> = vec![
         "--issue".into(),
         "-d".into(),
@@ -78,9 +77,9 @@ pub fn issue_cmd(domain: &str, ca: Ca, challenge: &Challenge) -> Result<Cmd, Err
         }
     }
     args.push("--cert-file".into());
-    args.push(format!("{CERT_DIR}/{domain}.cer"));
+    args.push(format!("{cert_dir}/{domain}.cer"));
     args.push("--key-file".into());
-    args.push(format!("{CERT_DIR}/{domain}.key"));
+    args.push(format!("{cert_dir}/{domain}.key"));
     Ok(Cmd::new("acme.sh").args(args))
 }
 
@@ -90,19 +89,19 @@ pub fn renew_cmd() -> Cmd {
 }
 
 /// 检查证书剩余有效期命令(openssl x509 -enddate)。
-pub fn enddate_cmd(domain: &str) -> Cmd {
+pub fn enddate_cmd(domain: &str, cert_dir: &str) -> Cmd {
     Cmd::new("openssl").args([
         "x509",
         "-enddate",
         "-noout",
         "-in",
-        &format!("{CERT_DIR}/{domain}.cer"),
+        &format!("{cert_dir}/{domain}.cer"),
     ])
 }
 
 /// 执行签发(经 Executor)。
-pub fn issue(domain: &str, ca: Ca, challenge: &Challenge, ex: &dyn Executor) -> Result<(), Error> {
-    let out = ex.run(&issue_cmd(domain, ca, challenge)?)?;
+pub fn issue(domain: &str, ca: Ca, challenge: &Challenge, cert_dir: &str, ex: &dyn Executor) -> Result<(), Error> {
+    let out = ex.run(&issue_cmd(domain, ca, challenge, cert_dir)?)?;
     if out.ok() {
         Ok(())
     } else {
@@ -134,18 +133,18 @@ mod tests {
 
     #[test]
     fn issue_cmd_standalone_letsencrypt() {
-        let c = issue_cmd("v.example.com", Ca::LetsEncrypt, &Challenge::Standalone).unwrap();
+        let c = issue_cmd("v.example.com", Ca::LetsEncrypt, &Challenge::Standalone, "/tmp/certs").unwrap();
         assert_eq!(c.program, "acme.sh");
         let d = c.display();
         assert!(d.contains("-d v.example.com"));
         assert!(d.contains("--server letsencrypt"));
         assert!(d.contains("--standalone"));
-        assert!(d.contains("/etc/vagent/certs/v.example.com.cer"));
+        assert!(d.contains("/tmp/certs/v.example.com.cer"));
     }
 
     #[test]
     fn issue_cmd_dns_zerossl() {
-        let c = issue_cmd("x.com", Ca::ZeroSsl, &Challenge::Dns("dns_cf".into())).unwrap();
+        let c = issue_cmd("x.com", Ca::ZeroSsl, &Challenge::Dns("dns_cf".into()), "/tmp/certs").unwrap();
         let d = c.display();
         assert!(d.contains("--server zerossl"));
         assert!(d.contains("--dns dns_cf"));
@@ -153,7 +152,7 @@ mod tests {
 
     #[test]
     fn buypass_rejects_dns() {
-        let r = issue_cmd("x.com", Ca::BuyPass, &Challenge::Dns("dns_cf".into()));
+        let r = issue_cmd("x.com", Ca::BuyPass, &Challenge::Dns("dns_cf".into()), "/tmp/certs");
         assert!(r.is_err());
     }
 
@@ -174,21 +173,21 @@ mod tests {
 
     #[test]
     fn enddate_cmd_targets_cert() {
-        let c = enddate_cmd("x.com");
+        let c = enddate_cmd("x.com", "/tmp/certs");
         assert_eq!(c.program, "openssl");
-        assert!(c.display().contains("/etc/vagent/certs/x.com.cer"));
+        assert!(c.display().contains("/tmp/certs/x.com.cer"));
     }
 
     #[test]
     fn issue_failure_propagates() {
         let ex = FakeExecutor::new().expect("acme.sh", ExecOutput::failure(1, "dnserr"));
-        assert!(issue("x.com", Ca::LetsEncrypt, &Challenge::Standalone, &ex).is_err());
+        assert!(issue("x.com", Ca::LetsEncrypt, &Challenge::Standalone, "/tmp/certs", &ex).is_err());
     }
 
     #[test]
     fn issue_success_ok() {
         let ex = FakeExecutor::new().expect("acme.sh", ExecOutput::success("issued"));
-        assert!(issue("x.com", Ca::LetsEncrypt, &Challenge::Standalone, &ex).is_ok());
+        assert!(issue("x.com", Ca::LetsEncrypt, &Challenge::Standalone, "/tmp/certs", &ex).is_ok());
     }
 
     #[test]

@@ -10,10 +10,9 @@ use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
+use std::path::Path;
 
 type HmacSha256 = Hmac<Sha256>;
-
-const SECRET_PATH: &str = "/etc/vagent/secret";
 
 /// 传输层 → vless/trojan 链接的 type 参数。
 fn link_type(t: &Transport) -> &'static str {
@@ -141,17 +140,23 @@ pub fn verify(link: &str, secret: &[u8]) -> bool {
     expected.len() == sig.len() && expected.bytes().zip(sig.bytes()).all(|(a, b)| a == b)
 }
 
-/// 读取或生成 secret(600 权限)。
-pub fn load_or_create_secret() -> Result<Vec<u8>, Error> {
-    if let Ok(s) = std::fs::read(SECRET_PATH) {
+/// 读取或生成 secret(600 权限)。路径跟随 config 父目录(root-optional)。
+pub fn load_or_create_secret_at(secret_path: &Path) -> Result<Vec<u8>, Error> {
+    if let Ok(s) = std::fs::read(secret_path) {
         return Ok(s);
     }
     let secret: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
-    std::fs::write(SECRET_PATH, &secret)?;
-    let mut perms = std::fs::metadata(SECRET_PATH)?.permissions();
-    use std::os::unix::fs::PermissionsExt;
-    perms.set_mode(0o600);
-    std::fs::set_permissions(SECRET_PATH, perms)?;
+    if let Some(parent) = secret_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(secret_path, &secret)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(secret_path)?.permissions();
+        perms.set_mode(0o600);
+        std::fs::set_permissions(secret_path, perms)?;
+    }
     Ok(secret)
 }
 
@@ -255,6 +260,23 @@ mod tests {
         assert!(decoded.contains("\"outbounds\""));
     }
 
+    #[test]
+    fn load_or_create_secret_at_follows_path() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = tmp.path().join("vagent").join("secret");
+        let s1 = load_or_create_secret_at(&p).unwrap();
+        assert_eq!(s1.len(), 32);
+        // 二次读取应复用同一 secret
+        let s2 = load_or_create_secret_at(&p).unwrap();
+        assert_eq!(s1, s2);
+        // 文件权限 600
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&p).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o600);
+        }
+    }
     #[test]
     fn sign_and_verify_roundtrip() {
         let secret = b"test-secret-32-bytes-long-1234567890";

@@ -10,5 +10,6 @@ pub mod route;
 pub mod scan;
 pub mod service;
 pub mod status;
+pub mod subscribe;
 pub mod uninstall;
 pub mod user;

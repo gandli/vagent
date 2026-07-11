@@ -19,3 +19,4 @@ libc = "0.2"
 
 [dev-dependencies]
 rstest.workspace = true
+tempfile.workspace = true

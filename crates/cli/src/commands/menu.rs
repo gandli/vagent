@@ -40,6 +40,7 @@ pub fn run(config: &Path) -> anyhow::Result<()> {
             "证书管理",
             "服务管理",
             "Reality",
+            "订阅管理",
             "应用配置 (apply)",
             "查看状态",
             "卸载",
@@ -56,15 +57,16 @@ pub fn run(config: &Path) -> anyhow::Result<()> {
             Some(0) => user_menu(config)?,
             Some(1) => core_menu()?,
             Some(2) => route_menu(config)?,
-            Some(3) => cert_menu()?,
+            Some(3) => cert_menu(config)?,
             Some(4) => service_menu()?,
             Some(5) => reality_menu(config)?,
-            Some(6) => {
+            Some(6) => subscribe_menu(config)?,
+            Some(7) => {
                 println!("== 应用配置 ==");
                 commands::apply::run(config, false)?;
             }
-            Some(7) => commands::status::run(config)?,
-            Some(8) => {
+            Some(8) => commands::status::run(config)?,
+            Some(9) => {
                 println!("== 卸载 ==");
                 let purge = dialoguer::Confirm::new()
                     .with_prompt("同时删除配置目录?")
@@ -73,7 +75,7 @@ pub fn run(config: &Path) -> anyhow::Result<()> {
                     .unwrap_or(false);
                 commands::uninstall::run(purge)?;
             }
-            Some(9) | None => {
+            Some(10) | None => {
                 println!("再见。");
                 break;
             }
@@ -146,7 +148,8 @@ fn core_menu() -> anyhow::Result<()> {
                 commands::core_install::run("xray", &ver)?;
             }
             Some(1) => {
-                println!("Sing-box 安装尚未实现(Phase 2)");
+                let ver = prompt_text("Sing-box 版本(不含 v)", "1.10.0");
+                commands::core_install::run("singbox", &ver)?;
             }
             Some(2) => {
                 let core = select_one("内核", &["xray", "singbox"], 0);
@@ -215,7 +218,7 @@ fn route_menu(config: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn cert_menu() -> anyhow::Result<()> {
+fn cert_menu(config: &Path) -> anyhow::Result<()> {
     loop {
         println!();
         let items = ["签发证书", "续期所有证书", "返回"];
@@ -233,7 +236,7 @@ fn cert_menu() -> anyhow::Result<()> {
                 }
                 let ca = select_one("CA", &["letsencrypt", "zerossl", "buypass"], 0);
                 let dns = prompt_optional("DNS hook(如 dns_cf,留空走 standalone)");
-                commands::cert::issue(&domain, &ca, dns.as_deref())?;
+                commands::cert::issue(&domain, &ca, dns.as_deref(), config)?;
             }
             Some(1) => commands::cert::renew()?,
             Some(2) | None => break,
@@ -269,6 +272,25 @@ fn service_menu() -> anyhow::Result<()> {
     Ok(())
 }
 
+fn subscribe_menu(config: &Path) -> anyhow::Result<()> {
+    loop {
+        println!();
+        let items = ["生成订阅链接(多用户 bundle)", "生成签名订阅(可识别/吊销)", "返回"];
+        match Select::new()
+            .with_prompt("订阅管理")
+            .items(&items)
+            .default(0)
+            .interact_opt()
+            .unwrap_or(None)
+        {
+            Some(0) => commands::subscribe::run(config, false)?,
+            Some(1) => commands::subscribe::run(config, true)?,
+            Some(2) | None => break,
+            _ => {}
+        }
+    }
+    Ok(())
+}
 fn reality_menu(config: &Path) -> anyhow::Result<()> {
     loop {
         println!();

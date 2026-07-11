@@ -48,7 +48,7 @@ fn main() -> anyhow::Result<()> {
                 commands::route::run(&config, &action, value.as_deref())?
             }
             Commands::CertIssue { domain, ca, dns } => {
-                commands::cert::issue(&domain, &ca, dns.as_deref())?
+                commands::cert::issue(&domain, &ca, dns.as_deref(), &config)?
             }
             Commands::CertRenew => commands::cert::renew()?,
             Commands::Service { action, core, init } => match action.as_str() {
@@ -59,6 +59,7 @@ fn main() -> anyhow::Result<()> {
             Commands::RealityGen { name } => commands::reality::run(&config, name.as_deref())?,
             Commands::RealityScan { public_ip } => commands::scan::run(&config, &public_ip)?,
             Commands::Uninstall { purge } => commands::uninstall::run(purge)?,
+            Commands::Subscribe { sign } => commands::subscribe::run(&config, sign)?,
             Commands::Menu => commands::menu::run(&config)?,
         },
     }

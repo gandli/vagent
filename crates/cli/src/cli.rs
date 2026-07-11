@@ -132,4 +132,10 @@ pub enum Commands {
         #[arg(long)]
         purge: bool,
     },
+    /// 生成订阅链接(多用户 v2rayN 订阅 bundle)
+    Subscribe {
+        /// 对订阅做服务端签名(用于识别/吊销)
+        #[arg(long)]
+        sign: bool,
+    },
 }
