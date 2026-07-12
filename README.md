@@ -73,6 +73,9 @@ spec.toml ──┬─→ render/xray    → <base>/cores/xray/config.json
 
 三前端共享同一份 `core`,互不耦合。
 
+> `bot`(Teloxide) 当前**暂未接入 musl 静态发布**(发布物仅 `vagent` + `vagent-api`),
+> crate 以 `publish = false` 标注,保留供未来接入,不进 release 产物。
+
 ## 协议支持
 
 | 协议 | 承载内核 | 传输 |

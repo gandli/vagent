@@ -58,6 +58,8 @@ pub fn unit_install_path(init: InitSystem, core: &str, _base: &Path) -> PathBuf 
     }
 }
 pub fn is_root() -> bool {
+    // SAFETY: libc::getuid() 是 POSIX 只读 syscall 包装,不触达未初始化内存/无 UB;
+    // Rust std 无稳定 uid API,此处用 libc 是惯例做法。
     let uid = unsafe { libc::getuid() };
     uid == 0
 }

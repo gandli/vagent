@@ -49,11 +49,17 @@ async fn main() {
 
     let app = router(state);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:7800")
-        .await
-        .expect("bind 127.0.0.1:7800");
+    let listener = match tokio::net::TcpListener::bind("127.0.0.1:7800").await {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("绑定 127.0.0.1:7800 失败: {e}（端口可能被占用或权限不足）");
+            return;
+        }
+    };
     println!("vagent-api listening on http://127.0.0.1:7800");
-    axum::serve(listener, app).await.expect("server error");
+    if let Err(e) = axum::serve(listener, app).await {
+        eprintln!("server error: {e}");
+    }
 }
 
 /// 构造路由(导出以便将来做 oneshot 测试)。

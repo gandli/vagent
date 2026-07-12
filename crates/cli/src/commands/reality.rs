@@ -27,6 +27,8 @@ pub(crate) fn xray_bin() -> String {
             return p;
         }
     }
+    // SAFETY: libc::getuid() 是 POSIX 只读 syscall 包装,不触达未初始化内存/无 UB;
+    // Rust std 无稳定 uid API,此处用 libc 是惯例做法。
     if unsafe { libc::getuid() } == 0 {
         "/usr/local/bin/xray".to_string()
     } else {

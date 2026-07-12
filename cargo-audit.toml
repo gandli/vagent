@@ -1,0 +1,11 @@
+# cargo-audit 配置:记录供应链告警(非漏洞,仅维护状态)
+# 这些是当前锁文件里的传递依赖告警,无已知漏洞(RCE/内存安全/投毒)。
+# 锁死在传递依赖上,升级主依赖后方可消除;此处显式记录避免静默。
+
+[advisories]
+# proc-macro-error 1.0.4 — RUSTSEC-2024-0370 (unmaintained)
+# 传递依赖(经 syn/proc-macro2 链),无已知漏洞。
+ignore = [
+    "RUSTSEC-2024-0370",
+    "RUSTSEC-2025-0134", # rustls-pemfile 1.0.4 — unmaintained
+]

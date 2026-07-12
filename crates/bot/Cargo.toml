@@ -3,6 +3,9 @@ name = "vagent-bot"
 version.workspace = true
 edition = "2021"
 license.workspace = true
+# bot 前端暂未接入发布(musl 静态发布仅含 vagent-cli + vagent-api)。
+# 保留 crate 供未来 Teloxide 接入,当前不参与 release。
+publish = false
 
 [dependencies]
 vagent-core = { path = "../core" }
