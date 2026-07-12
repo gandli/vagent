@@ -128,9 +128,13 @@ impl Executor for RealExecutor {
 }
 
 /// 测试执行器:按 program 返回预设输出,并记命令历史供断言。
+/// 支持两种预设:
+/// - `expect(program, out)`:所有调用都返回同一 out(固定)
+/// - `expect_sequence(program, vec![a, b, c])`:第 1 次返回 a、第 2 次 b …… 用尽后持续返回最后一个
 #[derive(Default)]
 pub struct FakeExecutor {
     pub script: HashMap<String, ExecOutput>,
+    pub sequences: HashMap<String, Vec<ExecOutput>>,
     pub history: Vec<Cmd>,
 }
 
@@ -143,12 +147,29 @@ impl FakeExecutor {
         self.script.insert(program.into(), out);
         self
     }
+
+    /// 按调用次数返回序列输出(用于模拟「先失败后成功」等场景)。
+    pub fn expect_sequence(mut self, program: impl Into<String>, seq: Vec<ExecOutput>) -> Self {
+        self.sequences.insert(program.into(), seq);
+        self
+    }
 }
 
 impl Executor for FakeExecutor {
     fn run(&self, cmd: &Cmd) -> Result<ExecOutput, Error> {
         // 记录历史(需内部可变;用 RefCell 简化)
         HISTORY.with(|h| h.borrow_mut().push(cmd.clone()));
+        // 序列优先:按该 program 已调用次数取元素
+        if let Some(seq) = self.sequences.get(&cmd.program) {
+            let count = HISTORY.with(|h| {
+                h.borrow()
+                    .iter()
+                    .filter(|c| c.program == cmd.program)
+                    .count()
+            });
+            let idx = (count - 1).min(seq.len() - 1);
+            return Ok(seq[idx].clone());
+        }
         match self.script.get(&cmd.program) {
             Some(out) => Ok(out.clone()),
             None => Ok(ExecOutput::success("")),
