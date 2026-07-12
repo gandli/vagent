@@ -10,7 +10,7 @@ use vagent_core::{load_spec, save_spec};
 /// 1. 环境变量 XRAY_BIN(显式覆盖,CI/自定义安装用)
 /// 2. PATH 中的 xray(which 可见即返回 "xray")
 /// 3. 回退:root 用 /usr/local/bin/xray,普通用户用 ~/.local/bin/xray
-fn xray_bin() -> String {
+pub(crate) fn xray_bin() -> String {
     if let Ok(b) = std::env::var("XRAY_BIN") {
         if !b.is_empty() {
             return b;

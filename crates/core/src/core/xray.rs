@@ -1,7 +1,7 @@
 //! Xray-core 实现。
 
 use crate::core::{ProxyCore, Rendered};
-use crate::executor::Cmd;
+use crate::executor::{Cmd, Executor};
 use crate::render::xray;
 use crate::spec::Spec;
 use crate::Error;
@@ -39,12 +39,50 @@ impl ProxyCore for XrayCore {
     fn reload_cmd(&self) -> Cmd {
         Cmd::new("systemctl").args(["restart", "vagent-xray"])
     }
+
+    /// 重写安装:下载 → 解压 → 放置(三步走 Executor)。
+    fn install(&self, version: &str, ex: &dyn Executor) -> Result<(), Error> {
+        let out = ex.run(&self.install_cmd(version))?;
+        if !out.ok() {
+            return Err(Error::Render(format!(
+                "xray download failed: {}",
+                out.stderr
+            )));
+        }
+        let out =
+            ex.run(&Cmd::new("unzip").args(["-oq", "/tmp/xray.zip", "-d", "/tmp/xray-ext"]))?;
+        if !out.ok() {
+            return Err(Error::Render(format!(
+                "xray extract failed: {}",
+                out.stderr
+            )));
+        }
+        let dest = if crate::systemd::is_root() {
+            "/usr/local/bin".to_string()
+        } else {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            std::path::PathBuf::from(home)
+                .join(".local")
+                .join("bin")
+                .to_string_lossy()
+                .to_string()
+        };
+        let place = Cmd::new("sh").args([
+            "-c",
+            &format!("mkdir -p {d} && mv /tmp/xray-ext/xray {d}/xray", d = dest),
+        ]);
+        let out = ex.run(&place)?;
+        if !out.ok() {
+            return Err(Error::Render(format!("xray place failed: {}", out.stderr)));
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::executor::FakeExecutor;
+    use crate::executor::{ExecOutput, FakeExecutor};
     use crate::spec::Spec;
     use std::path::Path;
 
@@ -69,11 +107,23 @@ mod tests {
 
     #[test]
     fn install_failure_propagates() {
-        let ex = FakeExecutor::new().expect("curl", crate::executor::ExecOutput::failure(1, "404"));
+        let ex = FakeExecutor::new().expect("curl", ExecOutput::failure(1, "404"));
         let r = XrayCore.install("1.8.0", &ex);
         assert!(r.is_err());
     }
 
+    #[test]
+    fn install_runs_three_steps_via_executor() {
+        let ex = FakeExecutor::new()
+            .expect("curl", ExecOutput::success(""))
+            .expect("unzip", ExecOutput::success(""))
+            .expect("sh", ExecOutput::success(""));
+        assert!(XrayCore.install("1.8.23", &ex).is_ok());
+        let h = crate::executor::take_history();
+        assert!(h.iter().any(|c| c.program == "curl"));
+        assert!(h.iter().any(|c| c.program == "unzip"));
+        assert!(h.iter().any(|c| c.program == "sh"));
+    }
     #[test]
     fn reload_via_executor() {
         let ex = FakeExecutor::new().expect("systemctl", crate::executor::ExecOutput::success(""));

@@ -196,8 +196,14 @@ pub fn run(config: &Path) -> anyhow::Result<()> {
 }
 
 /// 一键 Reality:生成 Reality 用户 + 密钥 + 应用。
+/// 依赖 xray 二进制生成密钥;若未安装则提示先装内核,不崩溃。
 fn reality_oneclick(config: &Path) -> anyhow::Result<()> {
     println!("== 一键 Reality ==");
+    let xray = commands::reality::xray_bin();
+    if !std::path::Path::new(&xray).exists() {
+        println!("未检测到 xray({xray}),请先在『内核管理』安装 xray 后再用一键 Reality。");
+        return Ok(());
+    }
     commands::user::add(config, "reality", 443, "vless", "tcp")?;
     commands::reality::run(config, Some("reality"))?;
     commands::apply::run(config, false)?;
