@@ -82,7 +82,7 @@ impl ProxyCore for XrayCore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::executor::{take_history, ExecOutput, FakeExecutor};
+    use crate::executor::{ExecOutput, FakeExecutor};
     use crate::spec::Spec;
     use std::path::Path;
 
@@ -119,7 +119,7 @@ mod tests {
             .expect("unzip", crate::executor::ExecOutput::success(""))
             .expect("sh", crate::executor::ExecOutput::success(""));
         assert!(XrayCore.install("1.8.23", &ex).is_ok());
-        let h = take_history();
+        let h = crate::executor::take_history();
         assert!(h.iter().any(|c| c.program == "curl"));
         assert!(h.iter().any(|c| c.program == "unzip"));
         assert!(h.iter().any(|c| c.program == "sh"));
