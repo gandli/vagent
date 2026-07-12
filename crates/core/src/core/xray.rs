@@ -1,13 +1,42 @@
 //! Xray-core 实现。
 
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::core::{ProxyCore, Rendered};
-use crate::executor::{Cmd, Executor};
+use crate::executor::{Cmd, ExecOutput, Executor};
 use crate::render::xray;
 use crate::spec::Spec;
 use crate::Error;
 use std::path::Path;
+use std::time::Duration;
+
+/// 对**下载步骤**做有限重试(指数退避),符合 m13-domain-error:
+/// 仅 transient 的网络下载可重试;校验/解压/放置失败属 permanent,不重试(fail fast)。
+/// 同步 sleep(无 async runtime 依赖),最长退避随尝试次数增长。
+fn run_download_with_retry(
+    ex: &dyn Executor,
+    cmd: &Cmd,
+    max_retries: u32,
+) -> Result<ExecOutput, Error> {
+    let mut attempt = 0u32;
+    loop {
+        let out = ex.run(cmd)?; // Executor 内部错误(如无法 spawn)也纳入重试
+        if out.ok() {
+            return Ok(out);
+        }
+        attempt += 1;
+        if attempt >= max_retries {
+            return Err(Error::Render(format!(
+                "xray 下载失败(重试 {attempt} 次后仍失败): {}",
+                out.stderr
+            )));
+        }
+        // 指数退避:1s,4s,9s ……(attempt^2)
+        let backoff = (attempt * attempt).max(1) as u64;
+        warn!(target: "vagent::install", attempt, backoff_secs = backoff, "下载失败,重试");
+        std::thread::sleep(Duration::from_secs(backoff));
+    }
+}
 
 pub struct XrayCore;
 
@@ -45,7 +74,8 @@ impl ProxyCore for XrayCore {
     /// 重写安装:下载 → 校验完整性 → 解压 → 放置(四步走 Executor)。
     fn install(&self, version: &str, ex: &dyn Executor) -> Result<(), Error> {
         info!(target: "vagent::install", version, "下载 xray 内核");
-        let out = ex.run(&self.install_cmd(version))?;
+        // 下载步骤可重试(transient 网络错误);校验/解压/放置不重试(permanent fail fast)
+        let out = run_download_with_retry(ex, &self.install_cmd(version), 3)?;
         if !out.ok() {
             return Err(Error::Render(format!(
                 "xray download failed: {}",
@@ -143,18 +173,45 @@ mod tests {
     }
 
     #[test]
-    fn install_aborts_on_integrity_mismatch() {
-        // 下载成功但校验(sh)失败 → install 应中止报错,不解压
+    fn install_retries_transient_download_failure() {
+        // m13-domain-error:transient 下载失败应重试,最终成功
+        // curl 第一次失败、第二次成功 → install 应成功(校验/解压不重试,直接成功)
         let ex = FakeExecutor::new()
-            .expect("curl", ExecOutput::success(""))
-            .expect("sh", ExecOutput::failure(1, "sha256 mismatch"));
-        let r = XrayCore.install("1.8.23", &ex);
-        assert!(r.is_err(), "校验失败应中止安装");
-        let msg = format!("{:?}", r.unwrap_err());
+            .expect_sequence(
+                "curl",
+                vec![
+                    ExecOutput::failure(1, "connection reset"),
+                    ExecOutput::success(""),
+                ],
+            )
+            .expect("unzip", ExecOutput::success(""))
+            .expect("sh", ExecOutput::success("sha256 verified: abc"));
         assert!(
-            msg.contains("verify") || msg.contains("mismatch"),
-            "错误应指向校验: {msg}"
+            XrayCore.install("1.8.23", &ex).is_ok(),
+            "curl 先失败后成功应经重试成功"
         );
+        let h = crate::executor::take_history();
+        let curl_calls = h.iter().filter(|c| c.program == "curl").count();
+        assert_eq!(curl_calls, 2, "应重试 1 次(curl 被调用 2 次)");
+    }
+
+    #[test]
+    fn install_gives_up_after_max_retries() {
+        // curl 连续失败超过 max_retries(3) → 最终失败(不无限重试)
+        let ex = FakeExecutor::new().expect_sequence(
+            "curl",
+            vec![
+                ExecOutput::failure(1, "timeout"),
+                ExecOutput::failure(1, "timeout"),
+                ExecOutput::failure(1, "timeout"),
+                ExecOutput::failure(1, "timeout"),
+            ],
+        );
+        let r = XrayCore.install("1.8.23", &ex);
+        assert!(r.is_err(), "连续失败应最终返回 Err");
+        let h = crate::executor::take_history();
+        let curl_calls = h.iter().filter(|c| c.program == "curl").count();
+        assert_eq!(curl_calls, 3, "应最多重试 3 次(curl 被调用 3 次)");
     }
     #[test]
     fn reload_via_executor() {
