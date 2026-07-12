@@ -1,5 +1,7 @@
 //! Xray-core 实现。
 
+use tracing::info;
+
 use crate::core::{ProxyCore, Rendered};
 use crate::executor::{Cmd, Executor};
 use crate::render::xray;
@@ -42,6 +44,7 @@ impl ProxyCore for XrayCore {
 
     /// 重写安装:下载 → 校验完整性 → 解压 → 放置(四步走 Executor)。
     fn install(&self, version: &str, ex: &dyn Executor) -> Result<(), Error> {
+        info!(target: "vagent::install", version, "下载 xray 内核");
         let out = ex.run(&self.install_cmd(version))?;
         if !out.ok() {
             return Err(Error::Render(format!(
@@ -50,6 +53,7 @@ impl ProxyCore for XrayCore {
             )));
         }
         // 完整性校验:拉官方 .dgst 提取 SHA2-256,与本地 zip sha256sum 比对,不符即中止。
+        info!(target: "vagent::install", version, "校验 xray 下载完整性(官方 .dgst)");
         let dgst_url = crate::download::xray_dgst_url(version);
         let verify = crate::download::verify_cmd(&dgst_url, "/tmp/xray.zip");
         let out = ex.run(&verify)?;

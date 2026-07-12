@@ -129,7 +129,9 @@ pub fn plan(spec: &Spec, config: &Path) -> Result<Vec<Rendered>, Error> {
 /// 真实写盘(需 root)不在单测范围,由 VPS E2E 覆盖。
 pub fn apply(spec: &Spec, config: &Path, ex: &dyn Executor) -> Result<(), Error> {
     for r in plan(spec, config)? {
+        tracing::info!(target: "vagent::apply", path = %r.path, "写入内核配置");
         write_rendered(&r)?;
+        tracing::info!(target: "vagent::apply", path = %r.path, "重载内核");
         reload_by_path(&r.path, ex)?;
     }
     Ok(())

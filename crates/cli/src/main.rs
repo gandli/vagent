@@ -16,6 +16,16 @@ fn resolve_config() -> PathBuf {
 }
 
 fn main() -> anyhow::Result<()> {
+    // 结构化日志:默认 info,经 RUST_LOG/VAGENT_LOG 覆盖,输出 stderr 不污染 stdout 菜单
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .with_target(false)
+        .init();
+
     let cli = Cli::parse();
     let config = resolve_config();
 

@@ -37,7 +37,14 @@ impl ProxyCore for SingboxCore {
     }
 
     /// 重写安装:下载 → 解压 → 放置(三步走 Executor)。
+    /// 注意:sing-box 官方 release 不提供校验文件(改用 GitHub build attestation),
+    /// 故此处不调用 verify_cmd(避免伪造校验源);仅 Xray 支持官方 .dgst 校验。
+    /// 运维如需校验,应另行 `gh attestation verify`。
     fn install(&self, version: &str, ex: &dyn Executor) -> Result<(), Error> {
+        tracing::warn!(
+            target: "vagent::install",
+            "sing-box 官方未提供校验文件,跳过完整性校验(仅 Xray 支持官方 .dgst);如需校验请 `gh attestation verify`"
+        );
         let out = ex.run(&self.install_cmd(version))?;
         if !out.ok() {
             return Err(Error::Render(format!(
@@ -106,6 +113,23 @@ mod tests {
         assert!(h.iter().any(|c| c.program == "curl"));
         assert!(h.iter().any(|c| c.program == "tar"));
         assert!(h.iter().any(|c| c.program == "sh"));
+    }
+
+    #[test]
+    fn install_skips_integrity_verify_by_design() {
+        // R12:swing-box 官方无校验文件,install 不应调用 verify_cmd
+        // (避免伪造校验源)。curl/tar/sh 三步成功即视为安装成功。
+        let ex = FakeExecutor::new()
+            .expect("curl", ExecOutput::success(""))
+            .expect("tar", ExecOutput::success(""))
+            .expect("sh", ExecOutput::success(""));
+        assert!(SingboxCore.install("1.10.0", &ex).is_ok());
+        let h = take_history();
+        assert!(
+            !h.iter()
+                .any(|c| c.program == "sh" && c.display().contains("sha256sum")),
+            "sing-box 不应执行 sha256sum 校验"
+        );
     }
 
     #[test]

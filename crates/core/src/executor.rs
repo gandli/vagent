@@ -1,6 +1,8 @@
 //! Executor:core 内所有系统副作用的唯一出口。
 //! core 只构造 Cmd(意图),由 Executor 执行 —— 测试用 FakeExecutor 注入预设结果。
 
+use tracing::{debug, warn};
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -96,6 +98,7 @@ pub struct RealExecutor;
 
 impl Executor for RealExecutor {
     fn run(&self, cmd: &Cmd) -> Result<ExecOutput, Error> {
+        debug!(target: "vagent::exec", cmd = %cmd.display(), "exec");
         use std::process::Command;
         let mut c = Command::new(&cmd.program);
         c.args(&cmd.args);
@@ -106,8 +109,18 @@ impl Executor for RealExecutor {
             c.current_dir(cwd);
         }
         let out = c.output()?;
+        let status = out.status.code().unwrap_or(-1);
+        if status != 0 {
+            warn!(
+                target: "vagent::exec",
+                cmd = %cmd.display(),
+                status,
+                stderr = %String::from_utf8_lossy(&out.stderr).trim(),
+                "command exited non-zero"
+            );
+        }
         Ok(ExecOutput {
-            status: out.status.code().unwrap_or(-1),
+            status,
             stdout: String::from_utf8_lossy(&out.stdout).to_string(),
             stderr: String::from_utf8_lossy(&out.stderr).to_string(),
         })

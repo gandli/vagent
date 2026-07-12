@@ -150,11 +150,13 @@ mod tests {
     use tower::ServiceExt; // oneshot
 
     fn state_with(token: Option<&str>) -> SharedState {
-        let tmp = std::env::temp_dir().join(format!("vagent-api-test-{}", std::process::id()));
-        let cfg = tmp.join("spec.toml");
+        // 用 tempfile::tempdir 保证目录存在且唯一(避免对 temp_dir() 返回值的隐含依赖)
+        let tmp = tempfile::tempdir().expect("创建临时目录失败");
+        let cfg = tmp.path().join("spec.toml");
         let spec = vagent_core::Spec::default_for("t.example.com");
-        let _ = std::fs::create_dir_all(&tmp);
         vagent_core::save_spec(&spec, &cfg).unwrap();
+        // 持有 tmp 防止目录在测试期间被析构删除
+        std::mem::forget(tmp);
         Arc::new(AppState {
             config: cfg,
             token: token.map(|s| s.to_string()),
