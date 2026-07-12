@@ -11,7 +11,7 @@ pub fn run(config: &Path, sign: bool) -> anyhow::Result<()> {
         Ok(s) => s,
         Err(e) => {
             eprintln!("加载配置失败 {}: {e}", config.display());
-            std::process::exit(1);
+            return Err(anyhow::anyhow!("加载配置失败: {e}"));
         }
     };
     let bundle = subscribe::bundle(&spec).map_err(|e| anyhow::anyhow!(e))?;

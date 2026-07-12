@@ -405,8 +405,16 @@ fn subscribe_menu(config: &Path) -> anyhow::Result<()> {
             "返回",
         ];
         match menu_select("订阅管理", &items) {
-            Some(0) => commands::subscribe::run(config, false)?,
-            Some(1) => commands::subscribe::run(config, true)?,
+            Some(0) => {
+                if let Err(e) = commands::subscribe::run(config, false) {
+                    eprintln!("生成订阅失败: {e}");
+                }
+            }
+            Some(1) => {
+                if let Err(e) = commands::subscribe::run(config, true) {
+                    eprintln!("生成签名订阅失败: {e}");
+                }
+            }
             Some(2) | None => break,
             _ => {}
         }

@@ -8,7 +8,7 @@ pub fn run(config: &Path, dry_run: bool) -> anyhow::Result<()> {
         Ok(s) => s,
         Err(e) => {
             eprintln!("加载配置失败 {}: {e}", config.display());
-            std::process::exit(1);
+            return Err(anyhow::anyhow!("加载配置失败: {e}"));
         }
     };
 

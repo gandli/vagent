@@ -1,15 +1,9 @@
 use std::path::Path;
 use std::str::FromStr;
-use vagent_core::{load_spec, save_spec, Protocol, Transport};
+use vagent_core::{load_spec, save_spec, Protocol, Spec, Transport};
 
-fn load_or_exit(config: &Path) -> vagent_core::Spec {
-    match load_spec(config) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("加载配置失败 {}: {e}", config.display());
-            std::process::exit(1);
-        }
-    }
+fn load_or_err(config: &Path) -> anyhow::Result<Spec> {
+    load_spec(config).map_err(|e| anyhow::anyhow!("加载配置失败: {e}"))
 }
 
 /// reality=true 时传输强制 tcp(Reality 仅支持 tcp)。
@@ -21,7 +15,19 @@ pub fn add(
     transport: &str,
     reality: bool,
 ) -> anyhow::Result<()> {
-    let mut spec = load_or_exit(config);
+    let mut spec = load_or_err(config)?;
+    // 端口唯一性:同端口多 inbound 会导致 xray 绑定冲突
+    if spec.users.iter().any(|u| u.port == port) {
+        let owner = spec
+            .users
+            .iter()
+            .find(|u| u.port == port)
+            .map(|u| u.name.as_str())
+            .unwrap_or("未知");
+        return Err(anyhow::anyhow!(
+            "端口 {port} 已被用户 {owner} 占用,请换一个端口"
+        ));
+    }
     let proto = Protocol::from_str(protocol).map_err(|e| anyhow::anyhow!(e))?;
     let mut t = Transport::from_str(transport).map_err(|e| anyhow::anyhow!(e))?;
     // VLESS + Reality 时传输强制 tcp(Reality 仅 tcp)
@@ -47,7 +53,7 @@ pub fn add(
 }
 
 pub fn list(config: &Path) -> anyhow::Result<()> {
-    let spec = load_or_exit(config);
+    let spec = load_or_err(config)?;
     if spec.users.is_empty() {
         println!("(无用户)");
         return Ok(());
@@ -66,11 +72,10 @@ pub fn list(config: &Path) -> anyhow::Result<()> {
 }
 
 pub fn del(config: &Path, name: &str) -> anyhow::Result<()> {
-    let mut spec = load_or_exit(config);
+    let mut spec = load_or_err(config)?;
     let n = spec.remove_user(name);
     if n == 0 {
-        eprintln!("未找到用户: {name}");
-        std::process::exit(1);
+        return Err(anyhow::anyhow!("未找到用户: {name}"));
     }
     save_spec(&spec, config)?;
     println!("已删除用户 {name} ({n} 条)");
@@ -78,12 +83,11 @@ pub fn del(config: &Path, name: &str) -> anyhow::Result<()> {
 }
 
 pub fn link(config: &Path, name: &str) -> anyhow::Result<()> {
-    let spec = load_or_exit(config);
+    let spec = load_or_err(config)?;
     let user = match spec.users.iter().find(|u| u.name == name) {
         Some(u) => u,
         None => {
-            eprintln!("未找到用户: {name}");
-            std::process::exit(1);
+            return Err(anyhow::anyhow!("未找到用户: {name}"));
         }
     };
     let l = vagent_core::subscribe::gen_user(user, &spec).map_err(|e| anyhow::anyhow!(e))?;
@@ -122,6 +126,17 @@ mod tests {
         add(&cfg, "r", 443, "vless", "tcp", true).unwrap();
         let spec = load_spec(&cfg).unwrap();
         assert!(spec.users[0].reality, "显式 reality=true 应保留");
+        let _ = std::fs::remove_file(&cfg);
+    }
+
+    #[test]
+    fn add_rejects_duplicate_port() {
+        let cfg = fresh_cfg("/tmp/vagent-test-add-dup.toml");
+        add(&cfg, "alice", 443, "vless", "tcp", false).unwrap();
+        let r = add(&cfg, "bob", 443, "vmess", "tcp", false);
+        assert!(r.is_err(), "同端口重复添加应被拒绝");
+        let msg = r.unwrap_err().to_string();
+        assert!(msg.contains("占用"), "实际错误: {msg}");
         let _ = std::fs::remove_file(&cfg);
     }
 }

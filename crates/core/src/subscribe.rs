@@ -98,6 +98,7 @@ pub fn bundle(spec: &Spec) -> Result<String, Error> {
         .users
         .iter()
         .filter(|u| matches!(u.protocol, crate::spec::Protocol::Vless) && u.reality)
+        .filter(|u| !u.reality_pbk.is_empty()) // 跳过未生成密钥的 reality 用户,避免占位符下发
         .map(|u| {
             serde_json::json!({
                 "tag": u.name,
@@ -109,12 +110,17 @@ pub fn bundle(spec: &Spec) -> Result<String, Error> {
                 "tls": {
                     "enabled": true,
                     "server_name": spec.domain,
-                    "reality": { "enabled": true, "public_key": "<generated-by-xray>", "short_id": "" }
+                    "reality": { "enabled": true, "public_key": u.reality_pbk, "short_id": u.reality_sid }
                 },
                 "transport": "tcp"
             })
         })
         .collect();
+    if outbounds.is_empty() {
+        return Err(Error::Render(
+            "没有可用的 Reality 用户(需先生成 Reality 密钥)".into(),
+        ));
+    }
     let json = serde_json::to_string(&serde_json::json!({ "outbounds": outbounds }))
         .map_err(|e| Error::Render(e.to_string()))?;
     Ok(B64.encode(json))
@@ -251,13 +257,31 @@ mod tests {
         let mut spec = Spec::default_for("v.example.com");
         spec.add_user("alice", crate::spec::Protocol::Vless, 443, true);
         spec.add_user("bob", crate::spec::Protocol::Vless, 8443, true);
-        spec.add_user("carol", crate::spec::Protocol::Vmess, 443, false); // 排除
+        spec.add_user("carol", crate::spec::Protocol::Vmess, 9443, false); // 排除:非 reality
+                                                                           // Reality 用户须有已生成的公钥才进 bundle(避免下发占位符)
+        for u in spec.users.iter_mut() {
+            if u.reality {
+                u.reality_pbk = "test-public-key".into();
+                u.reality_sid = "0123abcd".into();
+            }
+        }
         let b = bundle(&spec).unwrap();
         let decoded = String::from_utf8(B64.decode(&b).unwrap()).unwrap();
         assert!(decoded.contains("alice"));
         assert!(decoded.contains("bob"));
         assert!(!decoded.contains("carol"));
         assert!(decoded.contains("\"outbounds\""));
+        assert!(decoded.contains("test-public-key"));
+    }
+
+    #[test]
+    fn bundle_errors_when_no_reality_user() {
+        // 无可用 Reality 用户(或密钥未生成)时应返回 Err,而非下发占位符
+        let mut spec = Spec::default_for("v.example.com");
+        spec.add_user("alice", crate::spec::Protocol::Vless, 443, false); // 普通 vless
+        spec.add_user("keyless", crate::spec::Protocol::Vless, 8443, true); // reality 但无密钥
+        let r = bundle(&spec);
+        assert!(r.is_err(), "无可用 Reality 用户时应返回 Err");
     }
 
     #[test]

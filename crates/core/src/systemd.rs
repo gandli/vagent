@@ -80,7 +80,7 @@ After=network.target\n\
 \n\
 [Service]\n\
 Type=simple\n\
-ExecStart={bin} apply --config {cfg}\n\
+ExecStart={bin} --apply --config {cfg}\n\
 Restart=on-failure\n\
 RestartSec=3\n\
 {user}\n\
@@ -99,7 +99,7 @@ fn openrc_script(core: &str, binary_path: &str, config: &str) -> String {
     format!(
         "#!/sbin/openrc-run\n\
 command=\"{bin}\"\n\
-command_args=\"apply --config {cfg}\"\n\
+command_args=\"--apply --config {cfg}\"\n\
 command_background=true\n\
 pidfile=\"/run/{name}.pid\"\n\
 description=\"vagent {core} managed by vagent\"\n",
@@ -131,7 +131,8 @@ After=network.target\n\
 \n\
 [Service]\n\
 Type=simple\n\
-ExecStart={bin} --config {cfg}\n\
+Environment=VAGENT_CONFIG={cfg}\n\
+ExecStart={bin}\n\
 Restart=on-failure\n\
 RestartSec=3\n\
 {user}\n\
@@ -194,7 +195,9 @@ mod tests {
     fn systemd_xray_contains_execstart() {
         let u = systemd_unit("xray", "/usr/local/bin/vagent", "/etc/vagent/spec.toml");
         assert!(u.contains("Description=vagent xray"));
-        assert!(u.contains("ExecStart=/usr/local/bin/vagent apply --config /etc/vagent/spec.toml"));
+        assert!(
+            u.contains("ExecStart=/usr/local/bin/vagent --apply --config /etc/vagent/spec.toml")
+        );
         assert!(u.contains("WantedBy=multi-user.target"));
     }
 
@@ -203,7 +206,7 @@ mod tests {
         let u = openrc_script("xray", "/usr/local/bin/vagent", "/etc/vagent/spec.toml");
         assert!(u.contains("#!/sbin/openrc-run"));
         assert!(u.contains("command=\"/usr/local/bin/vagent\""));
-        assert!(u.contains("command_args=\"apply --config /etc/vagent/spec.toml\""));
+        assert!(u.contains("command_args=\"--apply --config /etc/vagent/spec.toml\""));
     }
 
     #[test]
@@ -233,7 +236,8 @@ mod tests {
     fn api_unit_looback_service() {
         let u = api_unit("/usr/local/bin/vagent-api", "/etc/vagent/spec.toml");
         assert!(u.contains("vagent local API"));
-        assert!(u.contains("ExecStart=/usr/local/bin/vagent-api --config /etc/vagent/spec.toml"));
+        assert!(u.contains("Environment=VAGENT_CONFIG=/etc/vagent/spec.toml"));
+        assert!(u.contains("ExecStart=/usr/local/bin/vagent-api\n"));
         // root-optional:User 行不再永远 root
         if is_root() {
             assert!(u.contains("User=root"));
