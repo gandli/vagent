@@ -56,11 +56,8 @@ grep -q 'name = "reality"' "$VAGENT_CONFIG" && echo "reality user OK"
 grep -q 'reality_pbk' "$VAGENT_CONFIG" && echo "reality key generated OK" || echo "reality key MISSING (check xray)"
 
 echo "== [4] apply 渲染 + xray -test 校验配置合法 =="
-vagent </dev/null >/dev/null  # 确保无残留输入
 export VAGENT_TEST_INPUT=$'11\n0\n'   # 主菜单 11 → 应用配置(apply)
 vagent </dev/null
-XCFG="$VAGENT_CONFIG_DIR/cores/xray/config.json"
-# VAGENT_CONFIG_DIR 取 base_dir
 BASE_DIR="$(dirname "$VAGENT_CONFIG")"
 XCFG="$BASE_DIR/cores/xray/config.json"
 if [ -f "$XCFG" ]; then

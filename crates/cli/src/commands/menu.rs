@@ -204,7 +204,7 @@ fn reality_oneclick(config: &Path) -> anyhow::Result<()> {
         println!("未检测到 xray({xray}),请先在『内核管理』安装 xray 后再用一键 Reality。");
         return Ok(());
     }
-    commands::user::add(config, "reality", 443, "vless", "tcp")?;
+    commands::user::add(config, "reality", 443, "vless", "tcp", true)?;
     commands::reality::run(config, Some("reality"))?;
     commands::apply::run(config, false)?;
     Ok(())
@@ -221,7 +221,7 @@ fn proto_menu(config: &Path, proto: &str) -> anyhow::Result<()> {
                 let name = prompt_text("用户名", "alice");
                 let port_s = prompt_text("端口", "8443");
                 let port: u16 = port_s.trim().parse().unwrap_or(8443);
-                commands::user::add(config, &name, port, proto, "tcp")?;
+                commands::user::add(config, &name, port, proto, "tcp", false)?;
             }
             Some(1) => commands::user::list(config)?,
             Some(2) | None => break,
@@ -250,7 +250,7 @@ fn user_menu(config: &Path) -> anyhow::Result<()> {
                 } else {
                     select_one("传输层", &["tcp", "ws", "grpc", "xhttp"], 0)
                 };
-                commands::user::add(config, &name, port, &proto, &transport)?;
+                commands::user::add(config, &name, port, &proto, &transport, false)?;
             }
             Some(1) => commands::user::list(config)?,
             Some(2) => {
