@@ -47,8 +47,14 @@ pub trait ProxyCore {
     }
 
     /// 生命周期命令拼装(纯函数,便于单测)。
+    /// 非 root 用 `systemctl --user`(与单元安装在 ~/.config/systemd/user 对齐);
+    /// root 用系统级 systemctl。
     fn lifecycle_cmd(&self, action: &str) -> crate::executor::Cmd {
-        crate::executor::Cmd::new("systemctl").args([action, &self.service_name()])
+        if crate::systemd::is_root() {
+            crate::executor::Cmd::new("systemctl").args([action, &self.service_name()])
+        } else {
+            crate::executor::Cmd::new("systemctl").args(["--user", action, &self.service_name()])
+        }
     }
 
     /// 执行生命周期动作(start/stop/restart/enable/disable/status)。
@@ -203,6 +209,14 @@ mod tests {
         assert_eq!(c.program, "systemctl");
         assert!(c.args.contains(&"restart".to_string()));
         assert!(c.args.contains(&"vagent-xray".to_string()));
+        // root 分支(root CI runner)不应有 --user;非 root 分支由代码逻辑+Linux 非 root 手测保证
+        if crate::systemd::is_root() {
+            assert!(
+                !c.args.contains(&"--user".to_string()),
+                "root 下 lifecycle 不应加 --user: {:?}",
+                c.args
+            );
+        }
     }
 
     #[test]

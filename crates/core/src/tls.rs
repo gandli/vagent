@@ -3,9 +3,20 @@
 //! 支持多 CA(LetsEncrypt / ZeroSSL / BuyPass)与两种验证模式(standalone / DNS)。
 
 use crate::executor::{Cmd, Executor};
+use crate::systemd;
 use crate::Error;
 
-pub const ACME_HOME: &str = "/root/.acme.sh";
+/// acme.sh 主目录(root-optional):
+/// root 用 /root/.acme.sh(历史约定),非 root 落到 $HOME/.acme.sh,
+/// 与项目既有 root-optional 范式(getuid 分支路径)一致。
+pub fn acme_home() -> std::path::PathBuf {
+    if systemd::is_root() {
+        std::path::PathBuf::from("/root/.acme.sh")
+    } else {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        std::path::PathBuf::from(home).join(".acme.sh")
+    }
+}
 
 /// 证书颁发机构。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,6 +92,8 @@ pub fn issue_cmd(
             args.push(hook.clone());
         }
     }
+    args.push("--home".into());
+    args.push(acme_home().to_string_lossy().to_string());
     args.push("--cert-file".into());
     args.push(format!("{cert_dir}/{domain}.cer"));
     args.push("--key-file".into());
@@ -90,7 +103,7 @@ pub fn issue_cmd(
 
 /// 构造续期(cron)命令。
 pub fn renew_cmd() -> Cmd {
-    Cmd::new("acme.sh").args(["--cron", "--home", ACME_HOME])
+    Cmd::new("acme.sh").args(["--cron", "--home", &acme_home().to_string_lossy()])
 }
 
 /// 检查证书剩余有效期命令(openssl x509 -enddate)。
@@ -141,6 +154,27 @@ mod tests {
     use super::*;
     use crate::executor::{ExecOutput, FakeExecutor};
     use std::str::FromStr;
+
+    #[test]
+    fn issue_cmd_includes_home_flag() {
+        // 非 root 部署:acme.sh 必须显式 --home,否则回退 /root/.acme.sh(Permission denied)
+        let c = issue_cmd(
+            "v.example.com",
+            Ca::LetsEncrypt,
+            &Challenge::Standalone,
+            "/tmp/certs",
+        )
+        .unwrap();
+        let d = c.display();
+        assert!(d.contains("--home"), "签发必须显式指定 acme.sh home: {d}");
+    }
+
+    #[test]
+    fn renew_cmd_includes_home_flag() {
+        let c = renew_cmd();
+        let d = c.display();
+        assert!(d.contains("--home"), "续期必须显式指定 acme.sh home: {d}");
+    }
 
     #[test]
     fn issue_cmd_standalone_letsencrypt() {

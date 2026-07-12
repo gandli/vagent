@@ -163,10 +163,11 @@ pub fn install_unit(init: InitSystem, core: &str, content: &str, base: &Path) ->
 pub fn uninstall_cmds(base: &Path) -> Vec<crate::executor::Cmd> {
     use crate::executor::Cmd;
     let services = ["vagent-xray", "vagent-singbox", "vagent-api"];
+    let user_flag: &[&str] = if is_root() { &[] } else { &["--user"] };
     let mut cmds = vec![];
     for s in services {
-        cmds.push(Cmd::new("systemctl").args(["stop", s]));
-        cmds.push(Cmd::new("systemctl").args(["disable", s]));
+        cmds.push(Cmd::new("systemctl").args([user_flag, &["stop"], &[s]].concat()));
+        cmds.push(Cmd::new("systemctl").args([user_flag, &["disable"], &[s]].concat()));
         let unit = if is_root() {
             format!("/etc/systemd/system/{s}.service")
         } else {
@@ -176,7 +177,7 @@ pub fn uninstall_cmds(base: &Path) -> Vec<crate::executor::Cmd> {
         };
         cmds.push(Cmd::new("rm").args(["-f", &unit]));
     }
-    cmds.push(Cmd::new("systemctl").args(["daemon-reload"]));
+    cmds.push(Cmd::new("systemctl").args([user_flag, &["daemon-reload"]].concat()));
     cmds
 }
 
@@ -263,6 +264,13 @@ mod tests {
             assert!(all.contains(&format!("disable {s}")));
         }
         assert!(all.contains("daemon-reload"));
+        // root 分支(root CI runner)不应有 --user;非 root 分支由代码逻辑+Linux 非 root 手测保证
+        if is_root() {
+            assert!(
+                !all.contains("--user"),
+                "root 下 uninstall 不应加 --user: {all}"
+            );
+        }
     }
 
     #[test]
