@@ -31,6 +31,17 @@ jobs:
       - name: Test
         run: cargo test --all
 
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Supply-chain audit (cargo-audit.toml ignore 传递依赖 unmaintained)
+        run: cargo audit
+
   musl:
     runs-on: ubuntu-latest
     steps:
@@ -76,8 +87,8 @@ jobs:
         run: |
           rm -rf /tmp/vagent-ci-menu
           export VAGENT_CONFIG=/tmp/vagent-ci-menu/spec.toml
-          export VAGENT_TEST_INPUT=$'5\n0\nalice\n8443\n0\n4\n8\n0\n2\n13\n'
-          # 主菜单:5用户 → 0新增 → alice/8443/0(vless) → 4返回 → 8订阅 → 0生成 → 2返回 → 13退出
+          export VAGENT_TEST_INPUT=$'5\n0\nalice\n8443\n0\n4\n9\n0\n2\n15\n'
+          # 主菜单:5用户 → 0新增 → alice/8443/0(vless) → 4返回 → 9订阅 → 0生成 → 2返回 → 15退出
           ./target/release/vagent </dev/null
           grep -q 'name = "alice"' "$VAGENT_CONFIG" && echo "MENU FLOW OK: alice added via interactive menu"
 

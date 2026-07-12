@@ -18,7 +18,7 @@ wget -P ~ -N --no-check-certificate "https://raw.githubusercontent.com/gandli/va
 vagent            # 进入管理菜单:用户 / 内核 / 分流 / 证书 / Reality / 应用 ...
 ```
 
-菜单内一级导航:用户管理 · 内核管理 · 分流规则 · 证书管理 · 服务管理 · Reality · 订阅管理 · 应用配置 · 查看状态 · 卸载。
+菜单内一级导航:安装/重装 · 一键 Reality · Hysteria2 管理 · REALITY 管理 · Tuic 管理 · 用户管理 · 证书管理 · 伪装站管理 · 分流规则 · 订阅管理 · 内核管理 · 应用配置 · 查看状态 · 卸载 · 更新提示。
 
 > `vagent` 不接受子命令参数,所有操作在菜单内完成。仅 `--config`(或 `VAGENT_CONFIG`)可选指定配置路径。
 
