@@ -5,7 +5,13 @@
 #   accept.sh <TAG> user      # 普通用户模式:零参数菜单 + 加用户 + 默认路径落盘
 set -euo pipefail
 
-TAG="${1:-v20260712-025721}"
+# 默认 TAG 动态查 latest release(避免 stale fallback 用旧二进制)
+if [ -z "${1:-}" ]; then
+  TAG="$(curl -fsSL "https://api.github.com/repos/gandli/vagent/releases/latest" 2>/dev/null | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/.*: *"\(.*\)"/\1/')"
+  TAG="${TAG:-v20260712-041404}"
+else
+  TAG="$1"
+fi
 MODE="${2:-root}"
 REPO="gandli/vagent"
 BASE="https://github.com/${REPO}/releases/download/${TAG}"
@@ -62,7 +68,14 @@ BASE_DIR="$(dirname "$VAGENT_CONFIG")"
 XCFG="$BASE_DIR/cores/xray/config.json"
 if [ -f "$XCFG" ]; then
   echo "xray config written: $XCFG"
-  /usr/local/bin/xray -test -config "$XCFG" 2>&1 | head -3 && echo "xray config VALID" || echo "xray config INVALID"
+  # 占位符检查(vagent 渲染漏洞的兜底检测)
+  if grep -q "generated-by-xray" "$XCFG"; then
+    echo "xray config INVALID (含未生成密钥占位符)"
+    /usr/local/bin/xray -test -config "$XCFG" 2>&1 | head -5
+  else
+    /usr/local/bin/xray -test -config "$XCFG" 2>&1 | head -5
+    echo "xray config VALID"
+  fi
 else
   echo "xray config NOT written"
 fi
