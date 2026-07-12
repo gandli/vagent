@@ -55,7 +55,22 @@ vagent </dev/null
 grep -q 'name = "reality"' "$VAGENT_CONFIG" && echo "reality user OK"
 grep -q 'reality_pbk' "$VAGENT_CONFIG" && echo "reality key generated OK" || echo "reality key MISSING (check xray)"
 
-echo "== [4] 验证 systemd --user 单元生成 =="
+echo "== [4] apply 渲染 + xray -test 校验配置合法 =="
+vagent </dev/null >/dev/null  # 确保无残留输入
+export VAGENT_TEST_INPUT=$'11\n0\n'   # 主菜单 11 → 应用配置(apply)
+vagent </dev/null
+XCFG="$VAGENT_CONFIG_DIR/cores/xray/config.json"
+# VAGENT_CONFIG_DIR 取 base_dir
+BASE_DIR="$(dirname "$VAGENT_CONFIG")"
+XCFG="$BASE_DIR/cores/xray/config.json"
+if [ -f "$XCFG" ]; then
+  echo "xray config written: $XCFG"
+  /usr/local/bin/xray -test -config "$XCFG" 2>&1 | head -3 && echo "xray config VALID" || echo "xray config INVALID"
+else
+  echo "xray config NOT written"
+fi
+
+echo "== [5] 验证 systemd --user 单元生成 =="
 ls /root/.config/systemd/user/ 2>/dev/null && echo "user unit dir OK" || echo "no user unit (non-fatal)"
 
 echo "== 验收完成 =="
