@@ -2332,10 +2332,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "http-body-util",
  "rstest",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
+ "tower",
  "vagent-core",
 ]
 
