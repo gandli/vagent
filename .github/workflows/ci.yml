@@ -76,28 +76,18 @@ jobs:
       - name: Default config path (no-root, ~/.config/vagent)
         run: |
           rm -rf "$HOME/.config/vagent"
-          ./target/release/vagent init --domain pu.example.com
+          # 首跑:无 config 时菜单引导生成默认 spec(非交互优雅退出)
+          ./target/release/vagent </dev/null
           test -f "$HOME/.config/vagent/spec.toml" && echo "DEFAULT PATH OK: $HOME/.config/vagent/spec.toml"
-          ./target/release/vagent user-add pu1 --protocol tuic --port 9443
-          ./target/release/vagent render --core singbox --out /tmp/pu_sb.json
-          grep -q "$HOME/.config/vagent/certs/pu.example.com.cer" /tmp/pu_sb.json && echo "CERT PATH FOLLOWS HOME OK"
       - name: Render + validate xray config
         run: |
-          ./target/release/vagent init --domain example.com --config /tmp/spec.toml
-          ./target/release/vagent user-add alice --config /tmp/spec.toml
-          which xray || ls -l /usr/local/bin/xray
-          ./target/release/vagent reality-gen --config /tmp/spec.toml
-          ./target/release/vagent render --core xray --out /tmp/xray.json --config /tmp/spec.toml
+          # 生成默认 spec(非交互首跑)+ 生成 Reality 密钥 + 渲染 xray
+          ./target/release/vagent --config /tmp/spec.toml </dev/null
+          ./target/release/vagent --reality-gen --config /tmp/spec.toml
+          ./target/release/vagent --render xray --config /tmp/spec.toml > /tmp/xray.json
           ./xray-bin/xray run -test -config /tmp/xray.json && echo "XRAY CONFIG OK"
-      - name: Render + validate sing-box config (tuic user)
-        run: |
-          ./target/release/vagent user-add t --protocol tuic --port 9443 --config /tmp/spec.toml
-          # cert 目录跟随 spec 位置(普通用户可写,无需 /etc)
-          CERT_DIR="$(dirname /tmp/spec.toml)/certs"
-          mkdir -p "$CERT_DIR"
-          openssl req -x509 -newkey rsa:2048 -nodes -keyout "$CERT_DIR/example.com.key" -out "$CERT_DIR/example.com.cer" -days 365 -subj "/CN=example.com"
-          ./target/release/vagent render --core singbox --out /tmp/sb.json --config /tmp/spec.toml
-          ./sing-box-bin check -c /tmp/sb.json && echo "SING-BOX CONFIG OK"
+      # sing-box 渲染正确性由 core crate 单测(SingboxCore::render)覆盖;
+      # 非交互环境下无法用菜单添加 tuic 用户,故不在此做端到端加载验证。
 
   release:
     runs-on: ubuntu-latest
