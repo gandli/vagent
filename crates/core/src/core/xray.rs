@@ -44,11 +44,18 @@ impl ProxyCore for XrayCore {
     fn install(&self, version: &str, ex: &dyn Executor) -> Result<(), Error> {
         let out = ex.run(&self.install_cmd(version))?;
         if !out.ok() {
-            return Err(Error::Render(format!("xray download failed: {}", out.stderr)));
+            return Err(Error::Render(format!(
+                "xray download failed: {}",
+                out.stderr
+            )));
         }
-        let out = ex.run(&Cmd::new("unzip").args(["-oq", "/tmp/xray.zip", "-d", "/tmp/xray-ext"]))?;
+        let out =
+            ex.run(&Cmd::new("unzip").args(["-oq", "/tmp/xray.zip", "-d", "/tmp/xray-ext"]))?;
         if !out.ok() {
-            return Err(Error::Render(format!("xray extract failed: {}", out.stderr)));
+            return Err(Error::Render(format!(
+                "xray extract failed: {}",
+                out.stderr
+            )));
         }
         let dest = if crate::systemd::is_root() {
             "/usr/local/bin".to_string()
