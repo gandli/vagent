@@ -9,22 +9,22 @@ use assert_cmd::Command;
 use tempfile::tempdir;
 
 /// 构造菜单输入序列(每行一次消费)。
-/// 主菜单索引(对齐 v2ray-agent):
-/// 1安装 2一键Reality 3Hysteria2 4REALITY 5Tuic 6用户 7证书 8分流 9订阅
-/// 10内核 11应用 12状态 13卸载 0退出
+/// 主菜单索引(对齐 v2ray-agent,0 基):
+/// 0安装 1一键Reality 2Hysteria2 3REALITY 4Tuic 5用户 6证书 7分流 8订阅
+/// 9内核 10应用 11状态 12卸载 13退出
 /// 用户子菜单: 0新增 1列出 2删除 3链接 4返回
 /// 订阅子菜单: 0生成 1签名 2返回
 const FLOW_ADD_USER_AND_SUBSCRIBE: &str = "\
-6
+5
 0
 alice
 443
 0
 4
-9
+8
 0
 2
-0
+13
 ";
 
 #[test]
@@ -57,6 +57,7 @@ fn menu_no_input_exits_clean() {
         .unwrap()
         .env("HOME", tmp.path())
         .env("VAGENT_CONFIG", &cfg)
+        .env("VAGENT_TEST_INPUT", "")
         .assert();
     assert.success();
     assert!(

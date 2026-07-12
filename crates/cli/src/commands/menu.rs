@@ -32,6 +32,8 @@ fn next_test_line() -> Option<String> {
 }
 
 /// 菜单单选:优先消费测试输入(数字索引或匹配文本),否则走 dialoguer。
+/// 非交互模式(VAGENT_TEST_INPUT 已设置但输入耗尽)返回 None,由菜单循环退出,
+/// 避免 assert_cmd/管道下 dialoguer 误选默认项。
 fn menu_select(prompt: &str, items: &[&str]) -> Option<usize> {
     if let Some(line) = next_test_line() {
         let line = line.trim();
@@ -42,6 +44,10 @@ fn menu_select(prompt: &str, items: &[&str]) -> Option<usize> {
             return None;
         }
         return items.iter().position(|i| *i == line);
+    }
+    // 非交互模式:VAGENT_TEST_INPUT 存在但输入已耗尽 → 优雅退出。
+    if std::env::var("VAGENT_TEST_INPUT").is_ok() {
+        return None;
     }
     Select::new()
         .with_prompt(prompt)
@@ -134,58 +140,75 @@ pub fn run(config: &Path) -> anyhow::Result<()> {
         .map(|s| s.contains("users"))
         .unwrap_or(false);
 
+    let items = [
+        if installed {
+            "安装/重新安装"
+        } else {
+            "安装"
+        },
+        "一键 Reality(无域名)",
+        "Hysteria2 管理",
+        "REALITY 管理",
+        "Tuic 管理",
+        "用户管理",
+        "证书管理",
+        "分流规则",
+        "订阅管理",
+        "内核管理 (xray / sing-box)",
+        "应用配置 (apply)",
+        "查看状态",
+        "卸载",
+        "退出",
+    ];
+
     loop {
         println!();
         println!("==============================================================");
-        if installed {
-            println!("1. 重新安装");
-        } else {
-            println!("1. 安装");
-        }
-        println!("2. 一键 Reality(无域名)");
-        println!("3. Hysteria2 管理");
-        println!("4. REALITY 管理");
-        println!("5. Tuic 管理");
+        println!("0. {}", items[0]);
+        println!("1. {}", items[1]);
+        println!("2. {}", items[2]);
+        println!("3. {}", items[3]);
+        println!("4. {}", items[4]);
         println!("------------------------- 工具管理 -----------------------------");
-        println!("6. 用户管理");
-        println!("7. 证书管理");
-        println!("8. 分流规则");
-        println!("9. 订阅管理");
+        println!("5. {}", items[5]);
+        println!("6. {}", items[6]);
+        println!("7. {}", items[7]);
+        println!("8. {}", items[8]);
         println!("------------------------- 内核管理 -----------------------------");
-        println!("10. 内核管理 (xray / sing-box)");
-        println!("11. 应用配置 (apply)");
-        println!("12. 查看状态");
+        println!("9. {}", items[9]);
+        println!("10. {}", items[10]);
+        println!("11. {}", items[11]);
         println!("------------------------- 脚本管理 -----------------------------");
-        println!("13. 卸载");
-        println!("0. 退出");
+        println!("12. {}", items[12]);
+        println!("13. {}", items[13]);
         println!("==============================================================");
 
-        match menu_select("vagent 管理菜单", &[]) {
-            Some(1) => {
+        match menu_select("vagent 管理菜单", &items) {
+            Some(0) => {
                 // 安装 / 重新安装:装 xray + 应用
                 commands::core_install::run("xray", "1.8.23")?;
                 commands::apply::run(config, false)?;
             }
-            Some(2) => reality_oneclick(config)?,
-            Some(3) => proto_menu(config, "hysteria2")?,
-            Some(4) => reality_menu(config)?,
-            Some(5) => proto_menu(config, "tuic")?,
-            Some(6) => user_menu(config)?,
-            Some(7) => cert_menu(config)?,
-            Some(8) => route_menu(config)?,
-            Some(9) => subscribe_menu(config)?,
-            Some(10) => core_menu(config)?,
-            Some(11) => {
+            Some(1) => reality_oneclick(config)?,
+            Some(2) => proto_menu(config, "hysteria2")?,
+            Some(3) => reality_menu(config)?,
+            Some(4) => proto_menu(config, "tuic")?,
+            Some(5) => user_menu(config)?,
+            Some(6) => cert_menu(config)?,
+            Some(7) => route_menu(config)?,
+            Some(8) => subscribe_menu(config)?,
+            Some(9) => core_menu(config)?,
+            Some(10) => {
                 println!("== 应用配置 ==");
                 commands::apply::run(config, false)?;
             }
-            Some(12) => commands::status::run(config)?,
-            Some(13) => {
+            Some(11) => commands::status::run(config)?,
+            Some(12) => {
                 println!("== 卸载 ==");
                 let purge = menu_confirm("同时删除配置目录?", false);
                 commands::uninstall::run(purge)?;
             }
-            Some(0) | None => {
+            Some(13) | None => {
                 println!("再见。");
                 break;
             }
