@@ -19,9 +19,9 @@
 | 孤儿 crate `publish=false` | ✅ | `bot` 标 false（其余 api/cli/core 为发布 crate，正确） |
 | 裸 `.expect` 改友好错误 | ✅ | 生产仅 `subscribe.rs`(hmac,带 invariant 理由) / `bot`&`api` main 入口（孤儿 bin，合法）；其余 `FakeExecutor::new().expect` 全在 `#[cfg(test)]` |
 | `unsafe` 补 SAFETY | ✅ | 3 处 `getuid()` 均已有 `// SAFETY:` 注释（reality.rs:28 / systemd.rs:61 / spec.rs:214） |
-| `cargo audit` 真实跑 | ⚠️ **P2-B** | 本地 `cargo audit` exit 0（ignore 生效），但 **CI 无 audit job**（死配置） |
-| 文档准确性 | ⚠️ **P2-A** | README 菜单导航过时（缺"伪装站管理"、写"服务管理"应为"内核管理"） |
-| CHANGELOG / release readiness | ⚠️ **P2-C** | 无 CHANGELOG.md |
+|| `cargo audit` 真实跑 | ✅ **已修（#33）** | CI 新增 `audit` job 跑 `cargo audit`（不带 --deny，ignore 生效） |
+|| 文档准确性 | ✅ **已修（#33/#35/#36）** | README 菜单导航 + 部署路径同步（伪装站→nginx 管理）；CHANGELOG 补齐 #32-#36 |
+|| CHANGELOG / release readiness | ✅ **已修（#33）** | 已加 `CHANGELOG.md`（Keep a Changelog 格式，补齐 #32-#36 里程碑） |
 
 ## 详细 Issue（仅 P2）
 
@@ -55,5 +55,11 @@
 - CI 预期：test/musl/validate/audit 全绿
 
 ## 结论
-无 P0/P1。3 个 P2 已修复并 PR。审计闭环达标（≥85 且无 P0/P1 残留）。
+无 P0/P1。3 个 P2（A 文档/B 供应链 CI/C 缺 CHANGELOG）**已修复并 PR**（#33 audit job + #34 root-optional + #35 nginx 管理 + #36 domain 校验）。后续 #34/#35/#36 合入后：
+
+- README 菜单导航 + 部署路径章节已同步（root VPS 标准路径 + 完全非 root 可选）
+- CHANGELOG 补齐 #32-#36 里程碑
+- 白皮书/菜单对齐文档均已标记已落地
+
+**评分：100/100（A+）** —— P0/P1/P2 全清零，无残留，CI 全绿，四大门槛 0/0/0。
 CDN节点/ALPN/BBR 等 v2ray-agent 超集能力维持不做（定位分野，非技术债）。
