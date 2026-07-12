@@ -21,6 +21,16 @@ pub struct Rules {
     /// 强制直连的域名(白名单,优先级最高)。
     #[serde(default)]
     pub direct_domains: Vec<String>,
+    /// 高级用户自定义分流规则(原样拼入 xray/sing-box routing.rules)。
+    /// 每行一条规则 JSON,如 {"type":"field","ipinfo_country":"cn","outboundTag":"direct"}。
+    /// 用于接入 geoip / 第三方规则 / 任意自定义,无需改 core 代码。空则无影响。
+    #[serde(default)]
+    pub extra_routing_rules: Vec<String>,
+    /// 高级用户自定义出站(原样拼入 outbounds)。
+    /// 每行一段出站 JSON,可接入第三方机场节点 / 任意自定义出站。
+    /// vagent 只做 JSON 合法性校验,不解析语义(用户自担其责)。空则无影响。
+    #[serde(default)]
+    pub custom_outbounds: Vec<String>,
 }
 
 impl Rules {

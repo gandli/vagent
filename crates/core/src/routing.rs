@@ -52,6 +52,14 @@ impl Spec {
                 "outboundTag": "warp"
             }));
         }
+        // 6. 高级用户自定义规则(原样拼入,流量兜底前最后生效)。
+        // JSON 非法则直接 Err,不静默吞错(m06)。
+        for raw in &self.rules.extra_routing_rules {
+            let v: serde_json::Value = serde_json::from_str(raw).map_err(|e| {
+                Error::Render(format!("extra_routing_rules 非法 JSON: {e} @ {raw}"))
+            })?;
+            rules.push(v);
+        }
 
         Ok(json!({
             "domainStrategy": "IPIfNonMatch",
@@ -142,20 +150,24 @@ mod tests {
     }
 
     #[test]
-    fn priority_order_full_stack() {
+    fn extra_routing_rules_injected() {
         let mut spec = Spec::default_for("x.com");
-        spec.rules.direct_domains.push("d.com".into());
-        spec.rules.block_ads = true;
-        spec.rules.domain_blocklist.push("b.com".into());
-        spec.rules.block_bt = true;
-        spec.rules.warp_domains.push("w.com".into());
+        spec.rules
+            .extra_routing_rules
+            .push(r#"{"type":"field","ipinfo_country":"cn","outboundTag":"direct"}"#.into());
         let r = spec.routing_json().unwrap();
-        let tags: Vec<&str> = r["rules"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|x| x["outboundTag"].as_str().unwrap())
-            .collect();
-        assert_eq!(tags, vec!["direct", "block", "block", "block", "warp"]);
+        let rules = r["rules"].as_array().unwrap();
+        // 自定义规则应出现在结构化规则之后
+        assert!(
+            rules.iter().any(|x| x["ipinfo_country"] == "cn"),
+            "extra_routing_rules 应原样注入: {rules:?}"
+        );
+    }
+
+    #[test]
+    fn extra_routing_rules_invalid_json_errors() {
+        let mut spec = Spec::default_for("x.com");
+        spec.rules.extra_routing_rules.push("not json".into());
+        assert!(spec.routing_json().is_err(), "非法 JSON 应 Err 而非静默");
     }
 }

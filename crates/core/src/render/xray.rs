@@ -168,6 +168,13 @@ pub fn render(spec: &Spec, base_dir: &Path) -> Result<serde_json::Value, Error> 
             }
         }));
     }
+    // 高级用户自定义出站(原样拼入,可接入第三方机场节点/任意自定义)。
+    // JSON 非法则直接 Err,不静默吞错(m06)。
+    for raw in &spec.rules.custom_outbounds {
+        let v: serde_json::Value = serde_json::from_str(raw)
+            .map_err(|e| Error::Render(format!("custom_outbounds 非法 JSON: {e} @ {raw}")))?;
+        outbounds.push(v);
+    }
 
     Ok(serde_json::json!({
         "log": { "loglevel": "warning" },
@@ -254,6 +261,45 @@ mod tests {
         let v = render(&spec, Path::new("/etc/vagent/spec.toml")).unwrap();
         assert!(!v["routing"]["rules"].as_array().unwrap().is_empty());
         assert_eq!(v["routing"]["domainStrategy"], "IPIfNonMatch");
+    }
+
+    #[test]
+    fn custom_outbounds_injected_xray() {
+        // 接入第三方机场节点:把机场出站 JSON 原样拼入 outbounds
+        let mut spec = Spec::default_for("x.com");
+        let airport = serde_json::json!({
+            "protocol": "vless",
+            "tag": "airport",
+            "settings": { "vnext": [{
+                "address": "hk.airport.com",
+                "port": 443,
+                "users": [{"id": "uuid-here"}]
+            }] }
+        });
+        spec.rules
+            .custom_outbounds
+            .push(serde_json::to_string(&airport).unwrap());
+        let v = render(&spec, Path::new("/etc/vagent/spec.toml")).unwrap();
+        let tags: Vec<&str> = v["outbounds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|o| o["tag"].as_str().unwrap())
+            .collect();
+        assert!(
+            tags.contains(&"airport"),
+            "custom_outbounds 应原样注入: {tags:?}"
+        );
+    }
+
+    #[test]
+    fn custom_outbounds_invalid_json_errors() {
+        let mut spec = Spec::default_for("x.com");
+        spec.rules.custom_outbounds.push("not json".into());
+        assert!(
+            render(&spec, Path::new("/etc/vagent/spec.toml")).is_err(),
+            "非法 JSON 应 Err 而非静默"
+        );
     }
 
     #[test]
