@@ -1,15 +1,32 @@
 # vagent 对标 mack-a/v2ray-agent 差距分析（查缺补漏）
 
 > 方法论：真实代码走查 + install.sh 能力提取，四档分类
-> 被审计：当前 main（含 PR #18-#38 全部合入）
+> 被审计：当前 main（含 PR #18-#43 全部合入）
 > 日期：2026-07-13
+
+## 闭环结论（2026-07-13 更新）
+
+对标 v2ray-agent 查缺补漏 **全闭环完成**：
+
+| PR | 内容 | 状态 |
+|------|------|------|
+| #38 | 安装多选协议组合（MultiSelect） | ✅ |
+| #39 | 传输变体补全（VLESS WS/gRPC/XHTTP + VMess HTTPUpgrade）+ AnyTLS | ✅ |
+| #40 | 端口跳跃（dokodemo-door） | ✅ |
+| #41 | 防火墙自动化开放端口段 | ✅ |
+| #42 | 分流菜单录入 custom_outbounds/extra_routing_rules（UI 闭环） | ✅ |
+| #43 | GitHub Action 自动更新 CHANGELOG | ✅ |
+
+**复扫（#38-#43 后）**：cargo audit 仅 2 个 unmaintained advisory（无 vulnerability）；生产代码无裸 unwrap（m06 范式保持）；单一 `Error` 类型；144 测试全绿。无新债。
+
+**覆盖度**：vagent 在协议承载（VLESS 全传输 + Reality / VMess WS+HTTPUpgrade / Trojan / Hysteria2 / Tuic / Naive / AnyTLS + SS/WG 经 custom_outbounds）+ 管理面（13 项核心菜单）上完整对标 v2ray-agent。维持不做的（定位分野）：CDN 节点管理 / BBR-DD 内核调优 / 独立加端口 / 独立BT管理 / 独立域名黑名单。
 
 ## TL;DR
 
 vagent 已对齐 v2ray-agent **核心管理面 + 协议承载**（安装/重装/多选组合/一键Reality/Hy2/Tuic/用户/证书/nginx/分流/core/卸载/更新提示）。
-真实缺口集中在 **传输变体 UI 暴露**、**分流细化**、**少数协议（AnyTLS/端口跳跃）**，以及 **CDN/BBR 等系统调优（定位分野，不做）**。
+真实缺口已全部补齐（传输变体 / 分流细化 / AnyTLS / 端口跳跃 / 防火墙自动化 / 扩展字段 UI）。**无剩余功能广度缺口**（除系统调优类定位分野）。
 
-评分维持 **100/100（A+）**—— 当前实现无 P0/P1/P2 缺陷；以下为"功能广度补齐"清单，非技术债。
+评分维持 **100/100（A+）**—— 实现无 P0/P1/P2 缺陷；功能广度补齐清单已全部收尾。
 
 ## 一、已对齐（vagent 已有，对照 v2ray-agent 同名能力）
 

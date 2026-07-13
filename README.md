@@ -1,26 +1,38 @@
 # vagent
 
-Rust 编写的 Xray-core / sing-box 管理工具。spec 驱动、双核抽象、单文件部署。定位为 [v2ray-agent](https://github.com/mack-a/v2ray-agent) 的类型安全替代实现。
+[v2ray-agent](https://github.com/mack-a/v2ray-agent) 的类型安全替代实现：Rust 编写，spec 驱动、双核（Xray-core / sing-box）抽象、musl 静态单文件部署。
 
 > 自托管运维工具。仅用于授权测试环境与自建 VPS。
 
-## 快速开始
+## 使用方法
 
-一句话安装(对标 v2ray-agent 的 `install.sh` 体验,musl 静态单文件,零依赖):
+**1. 安装**（一句话，musl 静态单文件，零依赖）：
 
 ```bash
 wget -P ~ -N --no-check-certificate "https://raw.githubusercontent.com/gandli/vagent/main/install.sh" && bash ~/install.sh
 ```
 
-安装完成后,**直接运行 `vagent` 进入交互式菜单**(对标 v2ray-agent 的 `vasma`),所有设定都在菜单里点选/输入完成,无需记命令行参数:
+**2. 运行**——直接执行 `vagent` 进入交互式菜单，所有设定在菜单里点选/输入完成，**无需记命令行参数**：
 
 ```bash
-vagent            # 进入管理菜单:用户 / 内核 / 分流 / 证书 / Reality / 应用 ...
+vagent            # 进入管理菜单
 ```
 
-菜单内一级导航:安装/重装 · 一键 Reality · Hysteria2 管理 · REALITY 管理 · Tuic 管理 · 用户管理 · 证书管理 · nginx 管理 · 分流规则 · 订阅管理 · 内核管理 · 应用配置 · 查看状态 · 卸载 · 更新提示。
+**3. 菜单内操作**（数字键选择，回车确认）。首次运行会引导你选协议组合并生成配置；之后常用路径：
 
-> `vagent` 不接受子命令参数,所有操作在菜单内完成。仅 `--config`(或 `VAGENT_CONFIG`)可选指定配置路径。
+```text
+# 首跑:选协议组合 → 自动开内核 + 建默认用户
+# 菜单 6 → 0        签证书 (acme.sh)
+# 菜单 7 → 0        装 nginx (apt/apk,root VPS)
+# 菜单 7 → 1        生成 443→本机 8443 反代配置
+# 菜单 5 → 0        新增用户(选协议/传输)
+# 菜单 8 → 6        导入机场节点(custom_outbounds)
+# 菜单 11           应用配置(渲染 + 写盘 + 重载)
+```
+
+一级导航：安装/重装 · 一键 Reality · Hysteria2 管理 · REALITY 管理 · Tuic 管理 · 用户管理 · 证书管理 · nginx 管理 · 分流规则 · 订阅管理 · 内核管理 · 应用配置 · 查看状态 · 卸载 · 更新提示。
+
+> `vagent` 不接受子命令参数，所有操作在菜单内完成。仅 `--config`（或 `VAGENT_CONFIG`）可选指定配置路径。
 
 ## 部署路径
 
@@ -178,3 +190,7 @@ cargo build --release --target x86_64-unknown-linux-musl
 2. CLI 仅为交互菜单,无子命令参数;菜单内调用 core/commands 函数
 3. 发布前:`make check`(cargo fmt + test + clippy)
 4. 变更走 PR,不直推 main
+
+## CHANGELOG 自动化
+
+合并到 `main` 的 PR 会由 [`.github/workflows/changelog.yml`](.github/workflows/changelog.yml) 自动追加到 `CHANGELOG.md` 的 `[Unreleased]` 段(`fix*` 类进 `Fixed`,其余进 `Added`,按 PR 编号去重)。无需手工维护。
