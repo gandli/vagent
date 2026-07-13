@@ -28,6 +28,14 @@ fn link_type(t: &Transport) -> &'static str {
 /// 生成单用户分享链接(支持 VLESS+Reality / VMess / Trojan / Hysteria2 / Tuic)。
 pub fn gen_user(user: &User, spec: &Spec) -> Result<String, Error> {
     let d = &spec.domain;
+    // 端口跳跃开启时,客户端连 dokodemo-door 跳跃端口(而非真实 127.0.0.1 端口)
+    let link_port = match &spec.port_hopping {
+        Some(hop) => {
+            let idx = spec.users.iter().position(|u| u.id == user.id);
+            hop.start + idx.unwrap_or(0) as u16
+        }
+        None => user.port,
+    };
     let link = match &user.protocol {
         Protocol::Vless if user.reality => {
             // 单一真相源:reality 用户必须有真实公钥,缺失即 Err(不再内联检查)
@@ -41,21 +49,21 @@ pub fn gen_user(user: &User, spec: &Spec) -> Result<String, Error> {
             );
             format!(
                 "vless://{}@{}:{}?{}#{}",
-                user.uuid, d, user.port, query, user.name
+                user.uuid, d, link_port, query, user.name
             )
         }
         Protocol::Vless => format!(
             "vless://{}@{}:{}?type={}#{}",
             user.uuid,
             d,
-            user.port,
+            link_port,
             link_type(&user.transport),
             user.name
         ),
         Protocol::Vmess => {
             let net = link_type(&user.transport);
             let cfg = serde_json::json!({
-                "v": "2", "ps": user.name, "add": d, "port": user.port.to_string(),
+                "v": "2", "ps": user.name, "add": d, "port": link_port.to_string(),
                 "id": user.uuid, "aid": "0", "net": net, "type": "none",
                 "host": d, "path": format!("/{}", user.id), "tls": ""
             });
@@ -66,25 +74,25 @@ pub fn gen_user(user: &User, spec: &Spec) -> Result<String, Error> {
             "trojan://{}@{}:{}?security=tls&type={}#{}",
             user.uuid,
             d,
-            user.port,
+            link_port,
             link_type(&user.transport),
             user.name
         ),
         Protocol::Hysteria2 => format!(
             "hysteria2://{}@{}:{}?sni={}#{}",
-            user.uuid, d, user.port, d, user.name
+            user.uuid, d, link_port, d, user.name
         ),
         Protocol::Tuic => format!(
             "tuic://{}:{}@{}:{}?congestion_control=bbr&alpn=h3&sni={}#{}",
-            user.uuid, user.uuid, d, user.port, d, user.name
+            user.uuid, user.uuid, d, link_port, d, user.name
         ),
         Protocol::Naive => format!(
             "naive+https://{}@{}:{}?sni={}#{}",
-            user.uuid, d, user.port, d, user.name
+            user.uuid, d, link_port, d, user.name
         ),
         Protocol::AnyTls => format!(
             "anytls://{}:{}@{}:{}?sni={}#{}",
-            user.uuid, user.uuid, d, user.port, d, user.name
+            user.uuid, user.uuid, d, link_port, d, user.name
         ),
     };
     Ok(link)
@@ -166,7 +174,7 @@ pub fn load_or_create_secret_at(secret_path: &Path) -> Result<Vec<u8>, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spec::User;
+    use crate::spec::{PortHopping, User};
 
     #[test]
     fn gen_user_formats_vless_link() {
@@ -301,6 +309,30 @@ mod tests {
             assert_eq!(mode, 0o600);
         }
     }
+    #[test]
+    fn gen_user_uses_hop_port_when_port_hopping() {
+        // 端口跳跃开启时,分享链接端口 = hop.start + 用户索引(对标 v2ray-agent 跳端口订阅)
+        let mut spec = Spec::default_for("x.com");
+        spec.users
+            .push(User::new("a", Protocol::Vless, 443, false, Transport::Tcp));
+        spec.users
+            .push(User::new("b", Protocol::Vless, 8443, false, Transport::Tcp));
+        spec.port_hopping = Some(PortHopping {
+            start: 30000,
+            end: 31000,
+        });
+        let link_a = gen_user(&spec.users[0], &spec).unwrap();
+        let link_b = gen_user(&spec.users[1], &spec).unwrap();
+        assert!(
+            link_a.contains(":30000?"),
+            "用户0 应连跳跃端口 30000: {link_a}"
+        );
+        assert!(
+            link_b.contains(":30001?"),
+            "用户1 应连跳跃端口 30001: {link_b}"
+        );
+    }
+
     #[test]
     fn sign_and_verify_roundtrip() {
         let secret = b"test-secret-32-bytes-long-1234567890";

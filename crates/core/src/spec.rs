@@ -85,6 +85,17 @@ pub struct Spec {
     /// nginx 前端(占 443 反代本机 + 伪装站)。默认空 = 不生成 nginx 配置。
     #[serde(default)]
     pub nginx: NginxConfig,
+    /// 端口跳跃(对标 v2ray-agent dokodemo-door):开启后真实 inbound 监听 127.0.0.1,
+    /// 由 dokodemo-door 在跳跃端口(范围首端口)接收外部流量并转发。抗封锁/规避单端口限流。
+    #[serde(default)]
+    pub port_hopping: Option<PortHopping>,
+}
+
+/// 端口跳跃范围。start..=end 为防火墙开放段;渲染时 dokodemo-door 监听 start 端口转发到真实 inbound。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PortHopping {
+    pub start: u16,
+    pub end: u16,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -243,6 +254,7 @@ impl Spec {
             users: vec![],
             rules: Rules::empty(),
             nginx: NginxConfig::empty(),
+            port_hopping: None,
         }
     }
 

@@ -45,7 +45,8 @@ vagent 已对齐 v2ray-agent **核心管理面 + 协议承载**（安装/重装/
 |------|------|------|------|------|
 | **VMess HTTPUpgrade** | `11_VMess_HTTPUpgrade_inbounds` | 中 | 补（抗封锁常用） | ✅ 已补(PR #39) |
 | **AnyTLS** | `13_anytls_inbounds`（sing-box） | 中 | 补（sing-box 原生） | ✅ 已补(PR #40) |
-| **端口跳跃（dokodemodoor）** | `02_dokodemodoor_inbounds` | 大 | 暂缓（进阶） | ⏸ 暂缓 |
+| **端口跳跃（dokodemodoor）** | `02_dokodemodoor_inbounds` | 大 | 补（已实现） | ✅ 已补(PR #40) |
+
 
 ## 四、定位分野，不做（vagent 是类型安全配置驱动，非系统调优脚本）
 

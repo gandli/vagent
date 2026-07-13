@@ -163,6 +163,36 @@ pub fn render(spec: &Spec, base_dir: &Path) -> Result<serde_json::Value, Error> 
         .flatten()
         .collect();
 
+    // 端口跳跃(对标 v2ray-agent dokodemo-door):
+    // 真实 inbound 改监听 127.0.0.1,由 dokodemo-door 在跳跃端口接收外部流量并转发。
+    // 抗封锁/规避单端口限流;防火墙需开放 start..=end(部署时手动或后续自动化)。
+    let mut inbounds = inbounds;
+    if let Some(hop) = &spec.port_hopping {
+        // 先改真实 inbound 监听地址 + 记录 (index, real_port),避免迭代中同时 push 的借用冲突
+        let hops: Vec<(usize, serde_json::Value)> = inbounds
+            .iter_mut()
+            .enumerate()
+            .map(|(i, ib)| {
+                ib["listen"] = serde_json::json!("127.0.0.1");
+                (i, ib["port"].clone())
+            })
+            .collect();
+        for (i, real_port) in hops {
+            let hop_port = hop.start + i as u16; // 每个真实 inbound 配一个跳跃端口
+            inbounds.push(serde_json::json!({
+                "listen": "0.0.0.0",
+                "port": hop_port,
+                "protocol": "dokodemo-door",
+                "settings": {
+                    "address": "127.0.0.1",
+                    "port": real_port,
+                    "network": "tcp"
+                },
+                "tag": format!("hop-{}", i)
+            }));
+        }
+    }
+
     let routing = spec.routing_json()?;
 
     let mut outbounds = vec![
@@ -293,6 +323,31 @@ mod tests {
         let ib = &v["inbounds"][0];
         assert_eq!(ib["protocol"], "vless");
         assert_eq!(ib["streamSettings"]["network"], "xhttp");
+    }
+
+    #[test]
+    fn render_port_hopping_adds_dokodemo_door() {
+        // 对标 v2ray-agent dokodemo-door 端口跳跃
+        let mut spec = Spec::default_for("x.com");
+        spec.users
+            .push(User::new("v", Protocol::Vless, 443, false, Transport::Tcp));
+        spec.port_hopping = Some(crate::spec::PortHopping {
+            start: 30000,
+            end: 31000,
+        });
+        let v = render(&spec, Path::new("/etc/vagent/spec.toml")).unwrap();
+        let ibs = v["inbounds"].as_array().unwrap();
+        // 真实 inbound 监听 127.0.0.1
+        let real = &ibs[0];
+        assert_eq!(real["listen"], "127.0.0.1");
+        assert_eq!(real["port"], 443);
+        // 额外 dokodemo-door 跳跃入口(监听 0.0.0.0:30000 → 127.0.0.1:443)
+        let hop = &ibs[1];
+        assert_eq!(hop["protocol"], "dokodemo-door");
+        assert_eq!(hop["listen"], "0.0.0.0");
+        assert_eq!(hop["port"], 30000);
+        assert_eq!(hop["settings"]["address"], "127.0.0.1");
+        assert_eq!(hop["settings"]["port"], 443);
     }
 
     #[test]

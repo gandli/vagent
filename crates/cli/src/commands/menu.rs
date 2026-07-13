@@ -9,7 +9,7 @@ use std::path::Path;
 use dialoguer::{Confirm, Input, MultiSelect, Select};
 
 use crate::commands;
-use vagent_core::{load_spec, save_spec, Protocol, Spec};
+use vagent_core::{load_spec, save_spec, PortHopping, Protocol, Spec};
 
 // 测试输入注入:环境变量 VAGENT_TEST_INPUT(换行分隔)。
 // 每行依次是:数字=菜单选择索引,文本=Input/Confirm 的答案。
@@ -99,6 +99,19 @@ fn multi_select(prompt: &str, items: &[&str]) -> Vec<usize> {
         .items(items)
         .interact()
         .unwrap_or_default()
+}
+
+/// 解析端口范围字符串(如 `30000-31000`) → (start, end)。格式错误返回 None。
+fn parse_port_range(s: &str) -> Option<(u16, u16)> {
+    let s = s.trim();
+    let (a, b) = s.split_once('-')?;
+    let a: u16 = a.trim().parse().ok()?;
+    let b: u16 = b.trim().parse().ok()?;
+    if a == 0 || b < a {
+        None
+    } else {
+        Some((a, b))
+    }
 }
 
 fn prompt_text(msg: &str, default: &str) -> String {
@@ -442,6 +455,7 @@ fn route_menu(config: &Path) -> anyhow::Result<()> {
             "加入 WARP 分流",
             "广告拦截 开/关",
             "BT 阻断 开/关",
+            "端口跳跃 开/关",
             "查看当前规则",
             "返回",
         ];
@@ -470,8 +484,26 @@ fn route_menu(config: &Path) -> anyhow::Result<()> {
             Some(4) => {
                 commands::route::run(config, "bt", Some("on"))?;
             }
-            Some(5) => commands::route::run(config, "list", None)?,
-            Some(6) | None => break,
+            Some(5) => {
+                // 端口跳跃(对标 v2ray-agent dokodemo-door):开则填范围,关则清空
+                let mut spec = load_spec(config)?;
+                if spec.port_hopping.is_some() {
+                    spec.port_hopping = None;
+                    save_spec(&spec, config)?;
+                    println!("端口跳跃已关闭");
+                } else {
+                    let range = prompt_text("端口跳跃范围(如 30000-31000)", "30000-31000");
+                    if let Some((s, e)) = parse_port_range(&range) {
+                        spec.port_hopping = Some(PortHopping { start: s, end: e });
+                        save_spec(&spec, config)?;
+                        println!("端口跳跃已开启:{s}-{e}(防火墙需开放该段)");
+                    } else {
+                        println!("范围格式错误,未修改");
+                    }
+                }
+            }
+            Some(6) => commands::route::run(config, "list", None)?,
+            Some(7) | None => break,
             _ => {}
         }
     }
