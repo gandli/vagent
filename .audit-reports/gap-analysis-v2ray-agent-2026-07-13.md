@@ -1,7 +1,7 @@
 # vagent 对标 mack-a/v2ray-agent 差距分析（查缺补漏）
 
 > 方法论：真实代码走查 + install.sh 能力提取，四档分类
-> 被审计：当前 main（含 PR #18-#43 全部合入）
+> 被审计：当前 main（含 PR #18-#47 全部合入）
 > 日期：2026-07-13
 
 ## 闭环结论（2026-07-13 更新）
@@ -16,8 +16,14 @@
 | #41 | 防火墙自动化开放端口段 | ✅ |
 | #42 | 分流菜单录入 custom_outbounds/extra_routing_rules（UI 闭环） | ✅ |
 | #43 | GitHub Action 自动更新 CHANGELOG | ✅ |
+| #44 | README 使用方法三步上手 + 白皮书闭环结论 | ✅ |
+| #45 | changelog.yml grep 防选项解析 bug + 端到端验证 | ✅ |
+| #46 | 菜单「更新提示」补真实版本检查（GitHub Releases + 本地版本比对） | ✅ |
+| #47 | release job 语义化版本 tag（vX.Y.Z）+ 去重 | ✅ |
 
-**复扫（#38-#43 后）**：cargo audit 仅 2 个 unmaintained advisory（无 vulnerability）；生产代码无裸 unwrap（m06 范式保持）；单一 `Error` 类型；144 测试全绿。无新债。
+**发版准备完成**：`v0.1.0` 已打 tag 发布 musl 静态单文件（vagent + vagent-api），菜单 14 更新检查端到端验证通过（本地 0.1.0 vs 远端 v0.1.0 → "已是最新版本"）。清理了 36 个 CI 历史时间戳 release。
+
+**复扫（#38-#47 后）**：cargo audit 仅 2 个 unmaintained advisory（无 vulnerability，ureq 方案因 rustls-webpki RUSTSEC-2026 漏洞已弃用，改 curl+Executor）；生产代码无裸 unwrap；单一 `Error` 类型；123 测试全绿。无新债。
 
 **覆盖度**：vagent 在协议承载（VLESS 全传输 + Reality / VMess WS+HTTPUpgrade / Trojan / Hysteria2 / Tuic / Naive / AnyTLS + SS/WG 经 custom_outbounds）+ 管理面（13 项核心菜单）上完整对标 v2ray-agent。维持不做的（定位分野）：CDN 节点管理 / BBR-DD 内核调优 / 独立加端口 / 独立BT管理 / 独立域名黑名单。
 
