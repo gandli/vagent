@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- docs: 白皮书闭环结论同步 #44-#47 + 发版准备 (#48)
 - feat: 菜单『更新提示』补真实版本检查 (#46)
 - CLI 菜单对齐 v2ray-agent：`7. nginx 管理` 暴露已实现的 `render::nginx` 能力（PR #32）
 - 菜单 `14. 更新提示` 项（仅文案）
