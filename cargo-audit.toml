@@ -8,4 +8,9 @@
 ignore = [
     "RUSTSEC-2024-0370",
     "RUSTSEC-2025-0134", # rustls-pemfile 1.0.4 — unmaintained
+    # h2 0.3.27 — RUSTSEC-2026-0258 (unbounded empty DATA frames, DoS)
+    # 传递依赖:teloxide 0.13 → reqwest 0.11 → h2 0.3。修复需升级到 h2 >= 0.4
+    # (reqwest 0.12 / hyper 1.x 链)。暴露面有限:vagent-api 仅绑定 127.0.0.1,
+    # 对外 443 由 nginx 反代(非 Rust h2 终结 HTTP/2)。teloxide 升级后移除本条。
+    "RUSTSEC-2026-0258",
 ]
