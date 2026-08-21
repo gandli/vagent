@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- Docs: refresh README (badges, license, menu accuracy) (#53)
 - chore(deps): bump clap from 4.6.1 to 4.6.2 (#50)
 - chore(deps): bump uuid from 1.23.4 to 1.24.0 (#49)
 - docs: 白皮书闭环结论同步 #44-#47 + 发版准备 (#48)
