@@ -1,5 +1,13 @@
 # vagent
 
+<p align="center">
+  <a href="./LICENSE"><img alt="License AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square"></a>
+  <img alt="Rust" src="https://img.shields.io/badge/Rust-stable-dea584?style=flat-square&logo=rust&logoColor=fff">
+  <img alt="Cores · Xray + sing-box" src="https://img.shields.io/badge/cores-xray_·_sing--box-161619?style=flat-square">
+  <a href="https://github.com/gandli/vagent/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/gandli/vagent/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/gandli/vagent/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/gandli/vagent?style=flat-square"></a>
+</p>
+
 [v2ray-agent](https://github.com/mack-a/v2ray-agent) 的类型安全替代实现：Rust 编写，spec 驱动、双核（Xray-core / sing-box）抽象、musl 静态单文件部署。
 
 > 自托管运维工具。仅用于授权测试环境与自建 VPS。
@@ -22,11 +30,11 @@ vagent            # 进入管理菜单
 
 ```text
 # 首跑:选协议组合 → 自动开内核 + 建默认用户
-# 菜单 6 → 0        签证书 (acme.sh)
-# 菜单 7 → 0        装 nginx (apt/apk,root VPS)
-# 菜单 7 → 1        生成 443→本机 8443 反代配置
-# 菜单 5 → 0        新增用户(选协议/传输)
-# 菜单 8 → 6        导入机场节点(custom_outbounds)
+# 菜单 6 → 签发证书 (acme.sh, standalone / DNS hook)
+# 菜单 7 → 装 nginx (apt/apk,root VPS)
+# 菜单 7 → 生成 443→本机 8443 反代配置
+# 菜单 5 → 新增用户(选协议/传输)
+# 菜单 8 → 导入机场节点(custom_outbounds)
 # 菜单 11           应用配置(渲染 + 写盘 + 重载)
 ```
 
@@ -80,7 +88,7 @@ vagent            # 菜单 → 安装内核 / 应用配置 / 内核管理(启停
 
 单一真相源:一份 `spec.toml` 描述域名、内核、用户、分流规则。所有内核配置、订阅链接、systemd 单元都从 spec 渲染得出,不反向解析 JSON。
 
-```
+```text
 spec.toml ──┬─→ render/xray    → <base>/cores/xray/config.json
             ├─→ render/singbox → <base>/cores/singbox/config.json
             ├─→ subscribe      → vless:// vmess:// trojan:// hysteria2:// tuic://
@@ -132,7 +140,8 @@ vagent                 # 进入管理菜单
 
 主菜单布局(分组对标 v2ray-agent):
 
-```
+```text
+0. 退出
 1. 安装 / 重新安装         (装 xray + 应用)
 2. 一键 Reality (无域名)
 3. Hysteria2 管理
@@ -141,18 +150,18 @@ vagent                 # 进入管理菜单
 ——— 工具管理 ———
 6. 用户管理               (VLESS-Reality / VMess / Trojan / Hysteria2 / Tuic / Naive)
 7. 证书管理               (acme.sh 签发 standalone / DNS、续期)
-8. 分流规则               (直连白名单 / 黑名单 / WARP / 广告拦截 / BT 阻断)
-9. 订阅管理               (多用户 v2rayN bundle,可选 HMAC 签名)
+8. nginx 管理             (装 nginx + 443 反代本机)
+9. 分流规则               (直连白名单 / 黑名单 / WARP / 广告拦截 / BT 阻断)
 ——— 内核管理 ———
 10. 内核管理              (安装 xray / sing-box,自动装 systemd 单元;启停/重启)
 11. 应用配置 (apply)      (渲染并重载启用的内核)
 12. 查看状态
 ——— 脚本管理 ———
 13. 卸载
-0. 退出
+14. 更新提示 (cargo install vagent)
 ```
 
-> 二进制层面不接受任何命令行参数(仅 `--help` / `--version` 由 clap 提供)。配置路径靠默认位置或 `VAGENT_CONFIG` 环境变量。
+> 二进制层面不接受任何命令行参数(仅 `--help` / `--version` 由 clap 提供)。配置路径靠默认位置或 `VAGENT_CONFIG` 环境变量。订阅管理与更新提示为独立菜单项,机场节点导入在「分流规则」子菜单内。
 
 ## 分流优先级
 
@@ -178,7 +187,7 @@ CLI 集成测试用 `assert_cmd` + `tempfile`,**通过 `VAGENT_TEST_INPUT` 环�
 
 ## 部署
 
-```
+```bash
 cargo build --release --target x86_64-unknown-linux-musl
 ```
 
@@ -194,3 +203,7 @@ cargo build --release --target x86_64-unknown-linux-musl
 ## CHANGELOG 自动化
 
 合并到 `main` 的 PR 会由 [`.github/workflows/changelog.yml`](.github/workflows/changelog.yml) 自动追加到 `CHANGELOG.md` 的 `[Unreleased]` 段(`fix*` 类进 `Fixed`,其余进 `Added`,按 PR 编号去重)。无需手工维护。
+
+## License
+
+[AGPL-3.0](LICENSE)
