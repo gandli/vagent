@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- chore(deps): bump http-body-util from 0.1.3 to 0.1.5 (#51)
 - Docs: refresh README (badges, license, menu accuracy) (#53)
 - chore(deps): bump clap from 4.6.1 to 4.6.2 (#50)
 - chore(deps): bump uuid from 1.23.4 to 1.24.0 (#49)
