@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- chore(deps): bump tokio from 1.52.3 to 1.53.1 (#52)
 - chore(deps): bump http-body-util from 0.1.3 to 0.1.5 (#51)
 - Docs: refresh README (badges, license, menu accuracy) (#53)
 - chore(deps): bump clap from 4.6.1 to 4.6.2 (#50)
