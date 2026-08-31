@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- chore(deps): bump libc from 0.2.186 to 0.2.189 (#55)
 - chore(deps): bump clap from 4.6.2 to 4.6.6 (#54)
 - chore(deps): bump tokio from 1.52.3 to 1.53.1 (#52)
 - chore(deps): bump http-body-util from 0.1.3 to 0.1.5 (#51)
